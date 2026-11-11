@@ -1,6 +1,6 @@
 # crew-chat
 
-[![CI](https://github.com/ZeilLabs/crew-chat/actions/workflows/ci.yml/badge.svg)](https://github.com/ZeilLabs/crew-chat/actions/workflows/ci.yml)
+[![CI](https://github.com/ToddZeil/crew-chat/actions/workflows/ci.yml/badge.svg)](https://github.com/ToddZeil/crew-chat/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A local web interface for [Firstmate](https://github.com/kunchenguid/firstmate). Each worker gets its own conversation, so you can follow its progress, answer its questions, and open its terminal without reading through one combined supervisor chat.
@@ -37,7 +37,7 @@ crew-chat is an independent project. It is not part of Firstmate and is not main
 ## Installation
 
 ```sh
-git clone https://github.com/ZeilLabs/crew-chat.git
+git clone https://github.com/ToddZeil/crew-chat.git
 cd crew-chat
 npm ci
 ```

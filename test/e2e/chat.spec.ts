@@ -710,6 +710,8 @@ test('queued work has its own conversation for planning with First mate, and the
   await box.press('Enter');
   await expect.poll(() => home.inboxLog().at(-1)?.at(-1)).toBe('[re: search-cache-warmup] Five minutes is fine.');
   await expect(page.locator('.msg.out', { hasText: 'Five minutes is fine.' })).toHaveCount(1);
+  // The stub logs its arguments before it writes the note, so wait for the note itself.
+  await expect.poll(() => home.noteIdFor('[re: search-cache-warmup] Five minutes is fine.')).not.toBeNull();
   const id = home.noteIdFor('[re: search-cache-warmup] Five minutes is fine.')!;
   home.replyToNote(id, 'Agreed, starting the worker now.', 950);
   await expect(msgs).toContainText('Agreed, starting the worker now.');
