@@ -13,6 +13,9 @@ crew-chat is an independent project. It is not part of Firstmate and is not main
 
 - **One conversation per worker.** Status updates arrive as messages as they are written. Unread messages are marked, and conversations are grouped into *Needs you*, *Working*, *Queued*, and *Done / stopped*.
 - **Decisions.** A worker's open decision shows an Answer button. The answer is delivered to the worker, and the decision is closed in Firstmate's records.
+  - When a decision asks several questions, in its own text or in the "Open questions" section of the worker's report, they are listed one by one, each with its own answer field and the worker's suggestion where it gave one.
+  - Plan approvals and lettered options such as (A) and (B) are shown as buttons.
+  - Everything is sent as one numbered reply, and questions left blank are listed as not answered yet.
 - **Terminal access.**
   - **Transcript** shows the worker's session history (Claude Code workers).
   - **Screen** mirrors its live terminal, with scrollback.
@@ -125,6 +128,7 @@ See [SECURITY.md](SECURITY.md) for details and for reporting vulnerabilities.
 | ![Open decision, dark theme](docs/screenshots/decision-thread-dark.png) | ![Completed worker, dark theme](docs/screenshots/done-thread-dark.png) |
 | ![Terminal panel](docs/screenshots/terminal-panel-light.png) | ![Markdown preview](docs/screenshots/markdown-preview-light.png) |
 | ![Queued request with planning](docs/screenshots/queued-planning-light.png) | ![First mate conversation](docs/screenshots/first-mate-light.png) |
+| ![A decision's open questions, one answer field each](docs/screenshots/decision-questions.png) | |
 
 ## Development
 

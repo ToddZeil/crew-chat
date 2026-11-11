@@ -67,6 +67,27 @@ export interface IncomingItem {
   resolution: string | null;
   // Set when the message is First mate's rather than the worker's.
   author?: 'firstmate';
+  // For an open decision: its questions laid out one by one.
+  form?: DecisionForm | null;
+}
+
+export interface DecisionQuestion {
+  n: string;
+  // The full question, as Markdown.
+  text: string;
+  // Short form used in the compiled answer.
+  label: string;
+  recommendation: string | null;
+}
+
+export interface DecisionForm {
+  // Where the questions came from, when not the decision text itself.
+  source: { path: string; heading: string } | null;
+  questions: DecisionQuestion[];
+  // Lettered choices offered in the decision text, such as (A) and (B).
+  options: { label: string; text: string }[];
+  // The decision asks for a plan to be approved.
+  approval: boolean;
 }
 
 export interface OutgoingItem {

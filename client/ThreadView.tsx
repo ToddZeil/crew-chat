@@ -5,6 +5,7 @@ import { BADGE_LABELS, Collapsible, ExternalLink, formatTokens, imageMarker, Ric
 import { Avatar, MessageList, type Author, type Row } from './messages.tsx';
 import { isActive } from './Sidebar.tsx';
 import { loadJson, newRequestId, noteAsWrite, PENDING_TEXT, saveJson, threadTag, type Notice } from './model.ts';
+import { QuestionForm } from './questions.tsx';
 import { TerminalPanel } from './TerminalPanel.tsx';
 
 export const YOU: Author = { key: 'you', name: 'You', kind: 'you' };
@@ -644,6 +645,7 @@ function incomingRow(
   const cls = ['in', `tone-${tone}`];
   if (item.decision) cls.push(`decision-${item.decision}`);
   const canAnswer = item.decision === 'open' && item.key !== null && !readOnly;
+  const form = item.decision === 'open' && item.key ? (item.form ?? null) : null;
   return {
     key: item.id,
     author,
@@ -651,7 +653,7 @@ function incomingRow(
     className: cls.join(' '),
     attrs: { 'data-verb': item.verb, 'data-decision': item.decision ?? undefined, 'data-at-source': item.atSource ?? 'none' },
     copyText: item.text,
-    actions: canAnswer && !answering ? (
+    actions: canAnswer && !answering && !form ? (
       <button type="button" className="bar-btn" onClick={() => setAnswering(item.id)} aria-label="Answer this decision" title="Answer">
         Answer
       </button>
@@ -665,7 +667,8 @@ function incomingRow(
     body: (
       <>
         <Collapsible text={item.text || '(no text)'} />
-        {item.decision === 'open' && item.key && !answering && (
+        {form && item.key && <QuestionForm form={form} threadId={threadId} decisionKey={item.key} readOnly={readOnly} addNotice={addNotice} />}
+        {!form && item.decision === 'open' && item.key && !answering && (
           <div className="decision-actions">
             <button type="button" className="btn primary" onClick={() => setAnswering(item.id)} disabled={readOnly} title={readOnly ? 'Read-only mode' : undefined}>
               Answer
@@ -673,7 +676,7 @@ function incomingRow(
             <span className="hint">Your answer goes to the worker and closes this decision.</span>
           </div>
         )}
-        {item.decision === 'open' && item.key && answering && (
+        {!form && item.decision === 'open' && item.key && answering && (
           <AnswerBox threadId={threadId} decisionKey={item.key} onDone={() => setAnswering(null)} addNotice={addNotice} />
         )}
         {item.decision === 'resolved' && item.resolution && (

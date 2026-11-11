@@ -1,4 +1,4 @@
-import type { NoteResult, ThreadSummary, WriteResult } from '../shared/types.ts';
+import type { DecisionForm, NoteResult, ThreadSummary, WriteResult } from '../shared/types.ts';
 
 export const FIRSTMATE = '__firstmate__';
 
@@ -88,4 +88,41 @@ export function noteAsWrite(r: NoteResult): WriteResult {
 // Must match server/placeholders.ts threadTag.
 export function threadTag(id: string): string {
   return `[re: ${id}] `;
+}
+
+export interface FormAnswers {
+  approval: string | null;
+  option: string | null;
+  answers: Record<string, string>;
+  other: string;
+}
+
+export const APPROVAL_CHOICES = ['Approved', 'Approved, with the changes below', 'Not approved yet'] as const;
+
+// One reply for the worker: the approval and choice first, then each answered
+// question by number, the numbers still open, and anything else.
+export function compileAnswer(form: DecisionForm, a: FormAnswers): string {
+  const out: string[] = [];
+  if (form.approval && a.approval) out.push(`Plan: ${a.approval}.`);
+  if (a.option) {
+    const opt = form.options.find((o) => o.label === a.option);
+    out.push(`Choice: (${a.option})${opt ? ` ${opt.text}` : ''}.`);
+  }
+  const answered = form.questions.filter((q) => a.answers[q.n]?.trim());
+  if (answered.length) {
+    const where = form.source ? ` in ${form.source.path.split('/').pop()}` : '';
+    out.push(`${out.length ? '\n' : ''}Answers to the open questions${where}:`);
+    for (const q of answered) {
+      const answer = a.answers[q.n].trim().replace(/\s*\n\s*/g, ' ');
+      out.push(q.label.endsWith('?') ? `${q.n}. ${q.label} ${answer}` : `${q.n}. ${q.label}: ${answer}`);
+    }
+  }
+  const open = form.questions.filter((q) => !a.answers[q.n]?.trim()).map((q) => q.n);
+  if (answered.length && open.length) out.push(`Not answered yet: ${open.join(', ')}.`);
+  if (a.other.trim()) out.push(`${out.length ? '\n' : ''}${a.other.trim()}`);
+  return out.join('\n');
+}
+
+export function formFilled(form: DecisionForm, a: FormAnswers): boolean {
+  return Boolean((form.approval && a.approval) || a.option || a.other.trim() || form.questions.some((q) => a.answers[q.n]?.trim()));
 }

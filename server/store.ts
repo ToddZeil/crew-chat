@@ -29,6 +29,7 @@ import {
   type BacklogTask,
   taskKind,
 } from './parse.ts';
+import { decisionForm } from './questions.ts';
 import { availability, type TmuxConfig } from './terminal.ts';
 import { Archive } from './archive.ts';
 import { rebuiltThread, recentlyClosed, savedThread } from './finished.ts';
@@ -543,6 +544,7 @@ export class Store extends EventEmitter {
       return p ? placeholderDetail(p, this.notes, Date.now()) : (this.finished(built).get(id) ?? null);
     }
     const incoming = this.incoming(id, meta);
+    for (const item of incoming) if (item.decision === 'open' && item.key) item.form = decisionForm(this.home, id, item.text);
     const outgoing = this.outgoing(id);
     const items = mergeTimeline(incoming, outgoing);
     // The planning chat from before the worker started stays in its thread.

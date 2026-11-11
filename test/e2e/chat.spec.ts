@@ -1025,6 +1025,70 @@ test('the theme menu on the rail picks light or dark over the system setting, an
   await q.close();
 });
 
+test('a decision with open questions lays them out one by one and sends them as one answer', async () => {
+  home.writeData(
+    'triage-plan',
+    'report.md',
+    [
+      '# Triage bot plan',
+      '',
+      '## Open questions for the captain',
+      '',
+      '1. **Who can see the board?** Only you, or the whole team? (I recommend the whole team.)',
+      '2. **History depth:** the last 12 months (recommended) or back to 2022?',
+      '3. **Slack replies:** should the bot post "ticket created: <link>" in the thread, or stay silent as proposed?',
+      '',
+      '## Verified vs inferred',
+      '',
+      '1. not a question',
+      '',
+    ].join('\n'),
+  );
+  home.add({
+    id: 'triage-plan',
+    title: 'Plan: feedback triage bot',
+    meta: { window: 'crewtest:fm-triage-plan', kind: 'plan', harness: 'claude' },
+    crewState: 'state: parked · source: status-log · needs-decision open: plan-ok',
+    status: [`needs-decision [key=plan-ok] [at=${now - 30}]: plan is in data/triage-plan/report.md. Captain still owes plan approval + 3 open questions`],
+  });
+  await row('triage-plan').click();
+  const form = page.getByTestId('question-form');
+  await expect(form).toContainText('3 questions to answer');
+  await expect(form).toContainText('Open questions for the captain');
+  await expect(form.getByTestId('question')).toHaveCount(3);
+  await expect(form.getByTestId('question').nth(2)).toContainText('ticket created: <link>');
+  await expect(form.getByRole('button', { name: /Send answers/ })).toBeDisabled();
+
+  await form.getByRole('radio', { name: 'Approved', exact: true }).click();
+  await form.getByRole('button', { name: /Suggested the whole team/ }).click();
+  await expect(form.getByRole('textbox', { name: 'Answer to question 1' })).toHaveValue('the whole team');
+  await form.getByRole('textbox', { name: 'Answer to question 3' }).fill('Reply once with the Jira link');
+  await expect(form).toContainText('2 of 3 answered');
+  await form.getByRole('button', { name: 'Preview' }).click();
+  await expect(form.getByTestId('answer-preview')).toContainText('Not answered yet: 2.');
+  const dismiss = page.getByRole('button', { name: 'Dismiss' });
+  while ((await dismiss.count()) > 0) await dismiss.first().click();
+  await form.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  await page.screenshot({ path: path.join(SHOTS, 'decision-questions.png') });
+
+  await form.getByRole('button', { name: 'Send answers' }).click();
+  await expect.poll(() => home.sendLog().at(-1)).toEqual([
+    'triage-plan',
+    '--resolve-key',
+    'plan-ok',
+    [
+      'Plan: Approved.',
+      '',
+      'Answers to the open questions in report.md:',
+      '1. Who can see the board? the whole team',
+      '3. Slack replies: Reply once with the Jira link',
+      'Not answered yet: 2.',
+    ].join('\n'),
+  ]);
+  await expect(page.locator('#item-s0')).toHaveAttribute('data-decision', 'resolved');
+  await expect(page.getByTestId('question-form')).toHaveCount(0);
+});
+
 test('a home with no workers shows an empty state', async ({ browser }) => {
   const empty = new FakeHome('crewchat-e2e-empty-');
   const log = path.join(empty.home, 'terminal.log');
