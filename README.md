@@ -1,163 +1,145 @@
-<div align="center">
-
-# 💬 crew-chat
-
-**Every Firstmate worker gets its own chat. See what each one is doing, answer it, and step into its terminal, all from one browser tab.**
+# crew-chat
 
 [![CI](https://github.com/ZeilLabs/crew-chat/actions/workflows/ci.yml/badge.svg)](https://github.com/ZeilLabs/crew-chat/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-![Node 23.6+](https://img.shields.io/badge/node-%E2%89%A523.6-339933?logo=node.js&logoColor=white)
-![Local only](https://img.shields.io/badge/runs-127.0.0.1%20only-555)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-An unofficial companion to [**Firstmate**](https://github.com/kunchenguid/firstmate): talk to one agent, ship with a crew, and now follow the crew one conversation at a time.
+A local web interface for [Firstmate](https://github.com/kunchenguid/firstmate). Each worker gets its own conversation, so you can follow its progress, answer its questions, and open its terminal without reading through one combined supervisor chat.
 
-![A worker waiting on a decision](docs/screenshots/decision-thread-light.png)
+crew-chat is an independent project. It is not part of Firstmate and is not maintained by its authors.
 
-</div>
+![A worker conversation with an open decision](docs/screenshots/decision-thread-light.png)
 
----
+## Features
 
-## ✨ Why
+- **One conversation per worker.** Status updates arrive as messages as they are written. Unread messages are marked, and conversations are grouped into *Needs you*, *Working*, *Queued*, and *Done / stopped*.
+- **Decisions.** A worker's open decision shows an Answer button. The answer is delivered to the worker, and the decision is closed in Firstmate's records.
+- **Terminal access.**
+  - **Transcript** shows the worker's session history (Claude Code workers).
+  - **Screen** mirrors its live terminal, with scrollback.
+  - **Open terminal** opens the worker's tmux window in a new terminal.
+- **First mate.** A conversation with the supervisor. Includes a form for requesting a new worker, with project, model, effort, and an optional planning step.
+- **Queued and finished work.** Requests and backlog tasks without a running worker appear as queued conversations. Workers that have been cleaned up keep their history and can be hidden.
+- **Attachments and previews.**
+  - Paste or drop images into a message.
+  - Markdown and terminal tables are rendered.
+  - Markdown files open in a side panel, and images open in a viewer.
+- **Usage.** Model, effort, context size, and token use for each worker, with a total for all workers.
+- **Clean up.** Runs Firstmate's teardown for a worker. If the worker has unlanded changes, the reason is shown, and discarding them requires typing the worker's id.
 
-Firstmate runs a whole crew of coding agents, but everything they report lands in one supervisor chat. crew-chat splits that into a team-chat layout you already know. There is one direct conversation per worker, a sidebar that shows who needs you, and every action is one click away. It runs on your machine, reads Firstmate's own files, and changes things only through Firstmate's own scripts.
+## Requirements
 
-## 🚀 Features
+- macOS or Linux
+- Node.js 23.6 or later (24 recommended)
+- A Firstmate home on the same machine (the directory containing Firstmate's `bin/` and `state/`)
+- tmux, as used by Firstmate for its workers
+- Claude Code workers, optional: needed for the Transcript tab and token counts
 
-| | |
-| --- | --- |
-| 🧵 **One conversation per worker** | Live updates as they happen, grouped by sender, split by day, with a red **New** line where your unread messages start. |
-| 🚦 **Who needs you, at a glance** | Sections for **Needs you**, **Working**, **Queued**, and **Done / stopped**. Red counts show open decisions. The browser tab shows **!** and a red dot whenever something waits on you. |
-| ✅ **Answer decisions in place** | A decision has an **Answer** button. Your reply goes to the worker and closes the decision in Firstmate's records. |
-| 🖥️ **Terminal beside the chat** | **Transcript** shows everything the worker said, ran, and got back. **Screen** mirrors its live terminal, with scrollback, even for full-screen programs. **Open terminal** jumps into its real tmux window. |
-| 🧭 **First mate, too** | A pinned conversation with the supervisor. **New worker** lets you pick the project, model, effort, and *plan it first*. The request gets its own conversation straight away. |
-| 🗂️ **Nothing disappears** | Work without a worker yet shows under **Queued**. Cleaned-up workers stay as **Finished** with their full history. Remove the ones you don't need. |
-| 🖼️ **Rich messages** | Paste or drag images in. Markdown and terminal tables render properly. Click any `.md` or image path for a clean preview. |
-| 📊 **Model and token use** | Each worker's model, effort, context size, and tokens used, plus a total across the crew. |
-| 🧹 **Safe clean-up** | **Clean up** runs Firstmate's own teardown. If work hasn't landed, it shows you why, and discarding needs you to type the worker's id. |
-| 🌗 **Light and dark** | Follows your system, or pick from the moon on the rail. |
-
-## 🏁 Quick start
-
-**You need:**
-
-- **macOS or Linux** with **Node.js 23.6 or newer** (24 recommended). crew-chat's server is TypeScript that Node runs directly.
-- A working **[Firstmate](https://github.com/kunchenguid/firstmate) home** on the same machine: the folder with Firstmate's `bin/` and `state/`.
-- **tmux**, which Firstmate uses for its workers. Open terminal and the Screen tab need it.
-- Optional: **Claude Code** workers, for the Transcript tab and token counts.
-
-**Then:**
+## Installation
 
 ```sh
 git clone https://github.com/ZeilLabs/crew-chat.git
 cd crew-chat
 npm ci
-FM_HOME=/path/to/your/firstmate npm start
 ```
 
-Open **<http://127.0.0.1:4477>**. Your workers appear in the sidebar straight away.
-
-> **macOS:** the first time you use **Open terminal**, macOS asks whether your terminal or Node may control Terminal.app. Allow it once in System Settings, then Privacy & Security, then Automation.
-
-At startup crew-chat checks your Firstmate home. If a script it needs is missing, the log and the page both say which features are affected.
-
-### Keep it running
-
-`npm start` rebuilds the page and starts the server in the foreground. To keep it running after you close the terminal:
+## Usage
 
 ```sh
-FM_HOME=/path/to/your/firstmate nohup npm start > ~/.crew-chat.log 2>&1 &
+FM_HOME=/path/to/firstmate npm start
 ```
 
-### Update or remove
+Then open <http://127.0.0.1:4477>.
+
+On startup, crew-chat checks that the Firstmate scripts it uses are present. Missing scripts, and the features they affect, are reported in the log and in the interface.
+
+On macOS, the first use of Open terminal triggers a system prompt asking for permission to control Terminal. You can also allow it under System Settings, Privacy & Security, Automation.
+
+To keep the server running after the terminal is closed:
 
 ```sh
-git pull && npm ci          # update, then start it again
-rm -rf ~/.crew-chat         # remove crew-chat's own data (sent list, saved threads, pasted images)
+FM_HOME=/path/to/firstmate nohup npm start > ~/.crew-chat.log 2>&1 &
 ```
 
-## ⚙️ Configuration
+To update, run `git pull && npm ci` and restart. crew-chat stores its own data in `~/.crew-chat`, which can be deleted to remove it completely.
 
-| Variable | What it does |
+## Configuration
+
+| Variable | Description |
 | --- | --- |
-| `FM_HOME` | **Required.** Your Firstmate home. |
-| `CREW_CHAT_PORT` | Port to listen on (default `4477`). |
-| `CREW_CHAT_READ_ONLY=1` | Look but don't touch: turns off Send, Answer, Open terminal, Clean up, and notes to First mate. |
-| `CREW_CHAT_DATA_DIR` | crew-chat's own data folder (default `~/.crew-chat`). It must be outside `FM_HOME`. |
-| `CREW_CHAT_UPLOAD_DIR` | Where pasted images go (default `uploads/` in the data folder). |
-| `CREW_CHAT_CLAUDE_PROJECTS` | Claude Code transcript folder (default `$CLAUDE_CONFIG_DIR/projects` or `~/.claude/projects`). |
-| `CREW_CHAT_NO_USAGE=1` | Don't read transcripts at all: no token counts or Transcript tab. |
-| `CREW_CHAT_TMUX_SOCKET` | Use a different tmux server: a name (as `tmux -L`) or a socket path (as `tmux -S`). |
-| `CREW_CHAT_TERMINAL_CMD` | How Open terminal opens a window, with a `{cmd}` placeholder, for example `gnome-terminal -- sh -c {cmd}`. The default is Terminal.app on macOS and `x-terminal-emulator` on Linux. |
+| `FM_HOME` | Required. Path to the Firstmate home. |
+| `CREW_CHAT_PORT` | Port to listen on. Default `4477`. |
+| `CREW_CHAT_READ_ONLY` | Set to `1` to disable sending, answering, opening terminals, cleanup, and notes to First mate. |
+| `CREW_CHAT_DATA_DIR` | crew-chat's data directory. Default `~/.crew-chat`. Must be outside `FM_HOME`. |
+| `CREW_CHAT_UPLOAD_DIR` | Directory for pasted images. Default `uploads/` inside the data directory. |
+| `CREW_CHAT_CLAUDE_PROJECTS` | Claude Code transcript directory. Default `$CLAUDE_CONFIG_DIR/projects` or `~/.claude/projects`. |
+| `CREW_CHAT_NO_USAGE` | Set to `1` to stop reading transcripts. Disables token counts and the Transcript tab. |
+| `CREW_CHAT_TMUX_SOCKET` | tmux server to use, as a socket name (`tmux -L`) or path (`tmux -S`). |
+| `CREW_CHAT_TERMINAL_CMD` | Command used by Open terminal, with `{cmd}` as a placeholder, for example `gnome-terminal -- sh -c {cmd}`. Defaults to Terminal.app on macOS and `x-terminal-emulator` on Linux. |
 
-## 📸 Tour
+## How it works
 
-| | |
+crew-chat is a small Node server and a React page. The server:
+
+- reads worker records, update logs, and inboxes from `$FM_HOME/state`
+- watches that directory for changes and pushes updates to the page
+- reads Firstmate's backlog and the briefs and reports under `$FM_HOME/data`
+
+It does not write to `$FM_HOME`. All changes go through Firstmate's own scripts, called with argument lists and never through a shell:
+
+| Action | Command |
 | --- | --- |
-| ![Decision, dark](docs/screenshots/decision-thread-dark.png) | ![Done, dark](docs/screenshots/done-thread-dark.png) |
-| **A decision waiting on you** (dark) | **A finished piece of work, with its PR** (dark) |
-| ![Terminal panel](docs/screenshots/terminal-panel-light.png) | ![Markdown preview](docs/screenshots/markdown-preview-light.png) |
-| **The worker's session history beside the chat** | **Click a report to preview it, tables and all** |
-| ![Queued and planning](docs/screenshots/queued-planning-light.png) | ![First mate](docs/screenshots/first-mate-light.png) |
-| **Planning a new worker with First mate** | **Your conversation with the supervisor** |
-| ![Finished](docs/screenshots/finished-thread-light.png) | ![Clean up refused](docs/screenshots/cleanup-refused-light.png) |
-| **History kept after clean-up** | **Clean-up that won't throw away unlanded work** |
+| Send a message | `fm-send.sh <id> <text>` |
+| Answer a decision | `fm-send.sh <id> --resolve-key <key> <text>` |
+| Message First mate | `fm-inbox.sh note --request-id <uuid> --json -- <text>` |
+| Clean up a worker | `fm-teardown.sh <id>`, with `--force` only after explicit confirmation |
 
-## 🔧 How it works
+Open decisions are determined by the same rules Firstmate uses, so an Answer button appears exactly when `fm-send.sh --resolve-key` will accept the answer.
 
-```mermaid
-flowchart LR
-  B["Your browser<br/>127.0.0.1:4477"] <-- "page, live updates" --> S["crew-chat server"]
-  S -- "reads (and watches)" --> ST["FM_HOME/state<br/>workers, update logs, inboxes"]
-  S -- "reads" --> D["FM_HOME/data<br/>projects, briefs, reports"]
-  S -- "runs" --> F["Firstmate scripts<br/>fm-send, fm-inbox, fm-teardown,<br/>fm-crew-state, fm-tasks-axi"]
-  S -- "reads" --> C["~/.claude/projects<br/>worker transcripts"]
-  S -- "capture, open window" --> T["tmux"]
-  S -- "own data" --> O["~/.crew-chat<br/>sent list, saved threads, images"]
-```
+Firstmate's inbox records do not identify the sender. crew-chat keeps a list of the messages it has sent, so it can show those as yours and everything else as First mate's.
 
-- **Read-only on Firstmate's files.** crew-chat never writes inside `FM_HOME`. Every change goes through Firstmate's own scripts, run with an argument list and never through a shell:
-  - Send: `fm-send.sh <id> <text>`
-  - Answer: `fm-send.sh <id> --resolve-key <key> <text>`
-  - Clean up: `fm-teardown.sh <id>`, and `--force` only after you type the id
-  - Notes to First mate: `fm-inbox.sh note --request-id <uuid> --json -- <text>`
-- **The same decision rules as Firstmate.** Open decisions are worked out the same way Firstmate does it. So the Answer button appears exactly when `fm-send.sh --resolve-key` will accept the answer.
-- **Who said what.** Firstmate's inbox doesn't record a sender, so crew-chat keeps its own list of what it sent. Your messages show as **You**, and anything else as **First mate**.
-- **Live.** The server watches `FM_HOME/state` and pushes changes to the page as they happen.
+## Compatibility
 
-## 🧩 Compatibility
-
-crew-chat reads Firstmate's internal files and calls its scripts, which can change between Firstmate releases. It was built and tested against Firstmate commit `1d43f9cb` (2026-11-10). The startup check names any script that is missing.
+crew-chat depends on Firstmate's on-disk formats and script interfaces, which are internal to Firstmate and may change between releases. This version was tested against Firstmate commit `1d43f9cb` (2026-11-10).
 
 | Platform | Status |
 | --- | --- |
-| macOS | ✅ Everything works. Open terminal uses Terminal.app. |
-| Linux | ✅ Everything works. Open terminal uses `x-terminal-emulator`, or set `CREW_CHAT_TERMINAL_CMD`. Paste with Ctrl+V. |
-| Windows | Untested. |
+| macOS | Supported. Open terminal uses Terminal.app. |
+| Linux | Supported. Open terminal uses `x-terminal-emulator`, or the command in `CREW_CHAT_TERMINAL_CMD`. |
+| Windows | Not tested. |
 
-## 🔒 Security and privacy
+## Security
 
-- crew-chat listens on **127.0.0.1 only** and has no login. Don't expose it beyond your machine.
-- It refuses write requests that come from other sites.
-- It previews files only from the Firstmate home, the worker's own worktree, or its uploads folder.
-- It renders worker text as untrusted, sanitised HTML.
-- Nothing it reads leaves your machine.
+crew-chat listens on 127.0.0.1 only and has no authentication. Do not expose it to other machines.
 
-See [SECURITY.md](SECURITY.md) for details and how to report a problem.
+- **Cross-site requests.** Write requests from other sites are rejected.
+- **File previews.** Files are served only from the Firstmate home, the worker's worktree, or the uploads directory.
+- **Untrusted content.** Rendered Markdown is sanitised.
+- **Data stays local.** Transcripts and other files read by crew-chat are not sent anywhere.
 
-## 🧪 Development
+See [SECURITY.md](SECURITY.md) for details and for reporting vulnerabilities.
+
+## Screenshots
+
+| | |
+| --- | --- |
+| ![Open decision, dark theme](docs/screenshots/decision-thread-dark.png) | ![Completed worker, dark theme](docs/screenshots/done-thread-dark.png) |
+| ![Terminal panel](docs/screenshots/terminal-panel-light.png) | ![Markdown preview](docs/screenshots/markdown-preview-light.png) |
+| ![Queued request with planning](docs/screenshots/queued-planning-light.png) | ![First mate conversation](docs/screenshots/first-mate-light.png) |
+
+## Development
 
 ```sh
-FM_HOME=/path/to/firstmate npm run dev   # hot reload on http://127.0.0.1:5180
+FM_HOME=/path/to/firstmate npm run dev   # development server with hot reload on port 5180
 npm run typecheck
 npm test                                 # unit tests
-npx playwright install chromium          # once, for the browser tests
-npm run test:e2e                         # builds the page and drives it in headless Chromium
+npx playwright install chromium          # first time only
+npm run test:e2e                         # browser tests
 ```
 
-Both test suites run against a throwaway fake Firstmate home whose scripts only record their arguments, so no test touches a real home. tmux tests use a private tmux server. The browser tests record the Open terminal command instead of opening a window, and they regenerate the screenshots in `docs/screenshots/`. CI runs everything on macOS and Ubuntu.
+Tests run against a temporary Firstmate home whose scripts are stubs that record their arguments, so they never modify a real home. tmux tests use a private tmux server. The browser tests also regenerate the screenshots in `docs/screenshots/`. CI runs both suites on macOS and Ubuntu.
 
-Contributions are welcome. Open an issue first for anything big.
+Bug reports and pull requests are welcome. For larger changes, please open an issue first.
 
-## 📄 License
+## License
 
-MIT. See [LICENSE](LICENSE).
+[MIT](LICENSE)

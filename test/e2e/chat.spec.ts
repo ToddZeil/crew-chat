@@ -386,13 +386,14 @@ test('pasting an image attaches it, and Send passes its saved path to the worker
   const img = page.locator('.msg.out').last().locator('.msg-image img');
   await expect(img).toBeVisible();
   expect(await img.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBe(4);
-  // Clicking the image opens it full size in the viewer.
+  // Clicking the image opens it full size in a lightbox over the page.
   await img.click();
-  const viewerImg = page.getByTestId('doc-viewer').locator('img.doc-img');
+  const viewerImg = page.getByTestId('image-viewer').locator('img.lightbox-img');
   await expect(viewerImg).toBeVisible();
   await expect.poll(() => viewerImg.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBe(4);
-  await page.keyboard.press('Escape');
   await expect(page.getByTestId('doc-viewer')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('image-viewer')).toHaveCount(0);
 });
 
 test('Cmd+V pastes an image from the system clipboard, in the box or anywhere in the conversation', async ({ browser }) => {

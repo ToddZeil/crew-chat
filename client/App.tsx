@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppConfig, FirstmateDetail, ThreadDetail, ThreadSummary, WriteResult } from '../shared/types.ts';
 import { api } from './api.ts';
 import { CleanupDialog, NewWorkerDialog } from './dialogs.tsx';
-import { DocContext, DocViewer } from './docs.tsx';
+import { DocContext, DocViewer, ImageViewer } from './docs.tsx';
+import { isImagePath } from './blocks.ts';
 import { FirstmateView, type NoteDraft } from './FirstMate.tsx';
 import { setUploadDir } from './format.tsx';
 import {
@@ -476,7 +477,15 @@ export function App() {
           }}
         />
       )}
-      {doc && <DocViewer path={doc.path} thread={doc.thread} onClose={() => setDoc(null)} />}
+      {doc &&
+        (isImagePath(doc.path) ? (
+          <ImageViewer path={doc.path} thread={doc.thread} onClose={() => setDoc(null)} />
+        ) : (
+          <>
+            <div className="drawer-scrim" onMouseDown={() => setDoc(null)} aria-hidden="true" />
+            <DocViewer path={doc.path} thread={doc.thread} onClose={() => setDoc(null)} />
+          </>
+        ))}
     </div>
     </DocContext.Provider>
   );
