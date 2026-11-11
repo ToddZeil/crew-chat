@@ -97,13 +97,13 @@ export interface FormAnswers {
   other: string;
 }
 
-export const APPROVAL_CHOICES = ['Approved', 'Approved, with the changes below', 'Not approved yet'] as const;
+export const APPROVAL_CHOICES = ['Approved', 'Approved, with changes', 'Not approved yet'] as const;
 
 // One reply for the worker: the approval and choice first, then each answered
 // question by number, the numbers still open, and anything else.
 export function compileAnswer(form: DecisionForm, a: FormAnswers): string {
   const out: string[] = [];
-  if (form.approval && a.approval) out.push(`Plan: ${a.approval}.`);
+  if (form.approval && a.approval) out.push(`Plan: ${a.approval}${a.approval === APPROVAL_CHOICES[1] && a.other.trim() ? ' (see below)' : ''}.`);
   if (a.option) {
     const opt = form.options.find((o) => o.label === a.option);
     out.push(`Choice: (${a.option})${opt ? ` ${opt.text}` : ''}.`);

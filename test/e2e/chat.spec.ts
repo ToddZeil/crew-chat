@@ -1086,6 +1086,7 @@ test('a decision with open questions lays them out one by one and sends them as 
     ].join('\n'),
   ]);
   await expect(page.locator('#item-s0')).toHaveAttribute('data-decision', 'resolved');
+  await expect(page.locator('#item-s0 .resolution')).toContainText('answered: Plan: Approved. Answers to the open questions in report.md: 1. Who can see the board? the whole team 3.');
   await expect(page.getByTestId('question-form')).toHaveCount(0);
 });
 

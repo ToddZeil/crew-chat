@@ -134,7 +134,7 @@ export function QuestionForm({
                 disabled={readOnly}
                 onClick={() => update({ ...a, approval: a.approval === c ? null : c })}
               >
-                {c === APPROVAL_CHOICES[1] ? 'Approved with changes' : c}
+                {c}
               </button>
             ))}
           </div>

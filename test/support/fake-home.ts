@@ -27,7 +27,7 @@ mkdir -p "$inbox/handled"
 seq=$(( $(find "$inbox" -name '*.msg' | wc -l) + 1 ))
 printf 'schema=fm-task-inbox.v1\\nat=%s\\nbody-terminator=1\\n--\\n%s\\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$text" > "$inbox/$(printf %03d "$seq").msg"
 if [ -n "$key" ]; then
-  printf 'resolved [key=%s] [at=%s]: answered: %s\\n' "$key" "$(date +%s)" "\${text%%$'\\n'*}" >> "$FM_HOME/state/$id.status"
+  printf 'resolved [key=%s] [at=%s]: answered: %s\\n' "$key" "$(date +%s)" "\$(printf '%s' "\$text" | tr '\\n\\r\\t' '   ')" >> "$FM_HOME/state/$id.status"
 fi
 # The real script rings the worker after saving the record, which takes a moment.
 [ -z "$slow" ] || sleep 1
