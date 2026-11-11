@@ -1,0 +1,6 @@
+window=firstmate-0:fm-search-sort
+endpoint_task_id=search-sort
+project=/Users/someone/projects/storefront
+harness=claude
+kind=ship
+pr=https://github.com/acme/storefront/pull/512

@@ -1,0 +1,36 @@
+{
+  "name": "crew-chat",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local chat view of Firstmate workers: one thread per worker.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=23.6"
+  },
+  "scripts": {
+    "build": "vite build",
+    "start": "vite build && node server/main.ts",
+    "serve": "node server/main.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "dev": "node server/dev.ts",
+    "test:e2e": "vite build && playwright test"
+  },
+  "dependencies": {
+    "dompurify": "3.4.17",
+    "marked": "18.1.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "typescript": "5.9.3",
+    "vite": "8.3.8",
+    "vitest": "5.1.0"
+  }
+}

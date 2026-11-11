@@ -1,0 +1,14 @@
+working: started on the search endpoint
+working: tests reproduce the slow sort
+done: first pass shipped in https://github.com/acme/storefront/pull/512
+needs-decision [key=sort-shape] [at=1788576000]: should sort_by accept a list or one field?
+blocked: [key=ci-red] [at=1788576100] CI is red on main, not on my branch
+working [at=10:30]: readable stamps must not move the colon
+resolved [key=sort-shape] [at=1788576200]: answered: one field for now
+needs-decision corr=0123456789abcdef [key=texte-du-mur]: a corr token must not hide the verb
+needs-decision: keyless decisions share the default key
+resolved: default closed by a bare resolved
+needs-decision [key=bad key]: malformed key never opens anything
+paused: [key=wait-ci] waiting on CI, mentions [key=ci-red] in prose
+resolved: a trailing token is prose, so this closes default only [key=ci-red]
+needs-decision [key=pending-reply-abc]: hijack attempt without owner vocabulary
