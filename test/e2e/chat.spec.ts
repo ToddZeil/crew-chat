@@ -1153,7 +1153,7 @@ test('right-clicking a worker opens a menu of quick actions', async () => {
 });
 
 test('Claude plan usage from a worker status bar shows small under the token total', async () => {
-  tm('send-keys', '-t', 'crewtest:fm-search-sort', "clear; printf ' Opus | storefront | context: 20%% | 5h:85%% (resets in 1h5m) 7d:42%% (resets in 2d3h) \\$1.00\\n'", 'Enter');
+  tm('send-keys', '-t', 'crewtest:fm-search-sort', "clear; printf 'Opus | 5h:85%% (resets in 1h5m) 7d:42%% (resets in 2d3h)\\n'", 'Enter');
   await expect.poll(() => tm('capture-pane', '-p', '-t', 'crewtest:fm-search-sort')).toContain('resets in 2d3h');
   await page.reload();
   const usage = page.getByTestId('plan-usage');
