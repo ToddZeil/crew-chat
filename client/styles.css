@@ -2938,10 +2938,6 @@ button.msg-image {
   gap: 6px;
 }
 
-.handoff-words {
-  color: var(--text-2);
-  font-size: 13px;
-}
 
 .handoff-note {
   font-size: 13px;
@@ -2953,4 +2949,12 @@ button.msg-image {
 
 .handoff-note.warn {
   color: var(--attention);
+}
+
+.handoff-phrase {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--code-bg);
+  color: var(--text);
+  font-size: 12.5px;
 }

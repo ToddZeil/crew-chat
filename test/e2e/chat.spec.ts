@@ -1172,16 +1172,22 @@ test('Claude plan usage from a worker status bar shows small under the token tot
 });
 
 test("a First mate reply that asks for a typed approval copies the words and opens First mate's terminal", async ({ browser }) => {
-  home.writeNote('note-approve', 'Is phase 1 ready to go?', true, 'Yes: Claude Code only accepts that approval in the main terminal. Type "go on phase 1" in the main terminal and it starts.');
+  // First mate's real reply, word for word.
+  const replyText =
+    'I checked before retrying: nothing has changed yet (the Jira permission file does not exist in the firstmate folder), so a retry would be refused exactly as before, and I promised not to keep retrying blocked calls. Fastest path: press "Copy and open First mate\'s terminal" on my earlier reply and send "go on phase 1" there, and I start it within a minute. Or paste the one-line settings command in that terminal so requests from here work in future (from my next session).';
+  home.writeNote('note-approve', 'Is phase 1 ready to go?', true, replyText);
   const ctx = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'], colorScheme: 'light' });
   const p = await ctx.newPage();
   try {
     await p.goto(`${server.base}/#/firstmate`);
     const reply = p.locator('[data-reply-to="note-approve"]');
     const handoff = reply.getByTestId('handoff');
-    await expect(handoff).toContainText('to type go on phase 1');
+    const button = handoff.getByRole('button', { name: "Copy go on phase 1 and open First mate's terminal" });
+    await expect(button).toBeVisible();
+    // Something else is already on the clipboard, as when the reply itself was copied earlier.
+    await p.evaluate((t) => navigator.clipboard.writeText(t), replyText);
     const before = readFileSync(terminalLog, 'utf8').trim().split('\n').filter(Boolean).length;
-    await handoff.getByRole('button', { name: "Copy and open First mate's terminal" }).click();
+    await button.click();
     await expect(handoff.getByRole('status')).toHaveText(`Copied "go on phase 1". Opened First mate's terminal: paste it there and press Enter.`);
     expect(await p.evaluate(() => navigator.clipboard.readText())).toBe('go on phase 1');
     await expect.poll(() => readFileSync(terminalLog, 'utf8').trim().split('\n').filter(Boolean).length).toBe(before + 1);
