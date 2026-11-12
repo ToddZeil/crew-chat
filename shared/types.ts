@@ -166,6 +166,19 @@ export interface NoteResult {
   error?: string;
 }
 
+// A worker started straight from crew-chat, with no First mate in the loop.
+// id is the task id once the task has been filed in the backlog.
+export interface DirectStartRequest {
+  project: string;
+  text: string;
+  model: string;
+  effort: string;
+}
+
+export interface StartWorkerResult extends WriteResult {
+  id: string | null;
+}
+
 // One step of a worker's session, from its Claude transcript: what it said,
 // a tool it ran, what came back, or a prompt it received.
 export interface ActivityEntry {

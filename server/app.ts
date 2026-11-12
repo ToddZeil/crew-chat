@@ -2,8 +2,9 @@ import { randomBytes } from 'node:crypto';
 import { createReadStream, existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import type { AppConfig, ClaudeLimits, CleanupResult, DocResult, NoteResult, PaneSnapshot, ThreadSummary, UploadResult, UsageReport, WriteResult } from '../shared/types.ts';
+import type { AppConfig, ClaudeLimits, CleanupResult, DocResult, NoteResult, PaneSnapshot, StartWorkerResult, ThreadSummary, UploadResult, UsageReport, WriteResult } from '../shared/types.ts';
 import { parseCost, parseStatusBar } from './limits.ts';
+import { DIRECT_EFFORTS, DIRECT_MODELS, startDirect } from './direct.ts';
 import { send, sendNote, teardown, validateText } from './fm.ts';
 import { missingScripts, REQUIRED_SCRIPTS } from './check.ts';
 import { SentLedger } from './ledger.ts';
@@ -285,6 +286,32 @@ export function createApp(opts: AppOptions): { server: http.Server; store: Store
     return json(res, result.outcome === 'refused' ? 502 : 200, result);
   }
 
+  // Starts a worker without First mate; the worker then shows as a thread like
+  // any other, once Firstmate's spawn writes its state.
+  async function handleDirectStart(req: http.IncomingMessage, res: http.ServerResponse) {
+    const refuse = (status: number, error: string) =>
+      json(res, status, { ok: false, id: null, outcome: 'refused', exitCode: null, stdout: '', stderr: '', error } satisfies StartWorkerResult);
+    if (!sameOrigin(req)) return refuse(403, 'Cross-site request refused.');
+    if (!(req.headers['content-type'] ?? '').startsWith('application/json')) return refuse(415, 'Send JSON.');
+    if (opts.readOnly) return refuse(403, 'This crew-chat is running read-only, so it cannot start a worker.');
+    let body: unknown;
+    try {
+      body = await readBody(req);
+    } catch (err) {
+      return refuse(400, (err as Error).message);
+    }
+    if (typeof body !== 'object' || body === null) return refuse(400, 'Send an object.');
+    const payload = body as Record<string, unknown>;
+    const projects = store.firstmate().projects.map((p) => p.name);
+    if (typeof payload.project !== 'string' || !projects.includes(payload.project)) return refuse(400, 'Pick a project from the list.');
+    if (typeof payload.text !== 'string' || payload.text.trim() === '') return refuse(400, 'Say what the worker should do.');
+    if (typeof payload.model !== 'string' || !DIRECT_MODELS.includes(payload.model)) return refuse(400, 'Pick a model from the list.');
+    if (typeof payload.effort !== 'string' || !DIRECT_EFFORTS.includes(payload.effort)) return refuse(400, 'Pick an effort from the list.');
+    const result = await startDirect(store.home, { project: payload.project, text: payload.text, model: payload.model, effort: payload.effort });
+    store.refreshBacklog();
+    return json(res, result.ok ? 200 : 502, result);
+  }
+
   // Files a message mentions, for the preview: only under the Firstmate home,
   // the worker's own worktree, or crew-chat's uploads, resolved through
   // symlinks first so a path cannot step outside them.
@@ -458,6 +485,9 @@ export function createApp(opts: AppOptions): { server: http.Server; store: Store
       }
       if (parts[1] === 'firstmate' && parts[2] === 'notes' && parts.length === 3 && req.method === 'POST') {
         return handleNote(req, res);
+      }
+      if (parts[1] === 'workers' && parts[2] === 'direct' && parts.length === 3 && req.method === 'POST') {
+        return handleDirectStart(req, res);
       }
       if (parts[1] !== 'threads') return json(res, 404, { error: 'Not found.' });
       if (req.method === 'GET' && parts.length === 2) return json(res, 200, store.summaries());

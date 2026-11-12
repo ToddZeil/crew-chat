@@ -21,6 +21,7 @@ crew-chat is an independent project. It is not part of Firstmate and is not main
   - **Screen** mirrors its live terminal, with scrollback.
   - **Open terminal** opens the worker's tmux window in a new terminal.
 - **First mate.** A conversation with the supervisor. Includes a form for requesting a new worker, with project, model, effort, and an optional planning step. Its Terminal tab shows First mate's session read-only: the Transcript always, and the Screen when First mate runs in tmux. Claude Code accepts some approvals only when they are typed in First mate's own terminal, so when a reply asks for one, a button copies the words to type, and opens that terminal when it is a tmux window running First mate. crew-chat never types into it.
+- **Start a worker directly.** The New worker form can skip First mate: crew-chat files the task in the backlog, writes its brief, and starts the worker itself, on a local branch with tool approvals on. The worker then appears as its own thread, like any other.
 - **Queued and finished work.** Requests and backlog tasks without a running worker appear as queued conversations. Workers that have been cleaned up keep their history and can be hidden.
 - **Attachments and previews.**
   - Paste or drop images into a message.
@@ -89,14 +90,17 @@ crew-chat is a small Node server and a React page. The server:
 - watches that directory for changes and pushes updates to the page
 - reads Firstmate's backlog and the briefs and reports under `$FM_HOME/data`
 
-It does not write to `$FM_HOME`. All changes go through Firstmate's own scripts, called with argument lists and never through a shell:
+Apart from starting a worker directly (below), it does not write to `$FM_HOME`. All changes go through Firstmate's own scripts, called with argument lists and never through a shell:
 
 | Action | Command |
 | --- | --- |
 | Send a message | `fm-send.sh <id> <text>` |
 | Answer a decision | `fm-send.sh <id> --resolve-key <key> <text>` |
 | Message First mate | `fm-inbox.sh note --request-id <uuid> --json -- <text>` |
+| Start a worker directly | `fm-tasks-axi.sh add <id> <title> --kind ship --repo <project> --queue`, then `fm-brief.sh <id> <project> --mode local-only`, `fm-dispatch-resolve.sh` when `config/crew-dispatch.json` exists, and `fm-spawn.sh <id> projects/<project> --mode local-only --yolo off` |
 | Clean up a worker | `fm-teardown.sh <id>`, with `--force` only after explicit confirmation |
+
+Starting a worker directly also fills in the placeholders of the brief `fm-brief.sh` scaffolds under `data/<id>/`. Its task id is `direct-<time>`. Model and effort are passed as chosen; Auto follows Firstmate's dispatch rules when they are configured. If the worker does not start, the task stays filed as Queued in the backlog.
 
 Open decisions are determined by the same rules Firstmate uses, so an Answer button appears exactly when `fm-send.sh --resolve-key` will accept the answer.
 

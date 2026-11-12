@@ -1,4 +1,4 @@
-import type { AppConfig, ClaudeLimits, TerminalAvailability, CleanupResult, FirstmateDetail, NoteResult, ThreadDetail, ThreadSummary, UploadResult, WriteResult } from '../shared/types.ts';
+import type { AppConfig, ClaudeLimits, DirectStartRequest, TerminalAvailability, CleanupResult, FirstmateDetail, NoteResult, StartWorkerResult, ThreadDetail, ThreadSummary, UploadResult, WriteResult } from '../shared/types.ts';
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { cache: 'no-store' });
@@ -43,6 +43,18 @@ export const api = {
       return (await res.json()) as UploadResult;
     } catch (err) {
       return { ok: false, error: `Could not save the image: ${(err as Error).message}` };
+    }
+  },
+  startDirect: async (body: DirectStartRequest): Promise<StartWorkerResult> => {
+    try {
+      const res = await fetch('/api/workers/direct', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return (await res.json()) as StartWorkerResult;
+    } catch (err) {
+      return { ok: false, id: null, outcome: 'refused', exitCode: null, stdout: '', stderr: '', error: `Could not reach crew-chat: ${(err as Error).message}` };
     }
   },
   firstmate: () => getJson<FirstmateDetail>('/api/firstmate'),

@@ -616,6 +616,13 @@ export function App() {
               window.location.hash = r.noteId ? `#/t/request-${encodeURIComponent(r.noteId)}` : '#/firstmate';
             })();
           }}
+          onStarted={(id) => {
+            setNewWorkerOpen(false);
+            void (async () => {
+              await refreshThreads();
+              window.location.hash = `#/t/${encodeURIComponent(id)}`;
+            })();
+          }}
         />
       )}
       {cleanupFor && (

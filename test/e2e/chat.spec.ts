@@ -689,7 +689,7 @@ test('New worker sends one request note to First mate', async () => {
   await dialog.getByRole('combobox', { name: 'Model' }).selectOption('haiku');
   await dialog.getByRole('combobox', { name: 'Effort' }).selectOption('xhigh');
   await dialog.getByRole('textbox', { name: 'What should it do?' }).fill('Tidy the README.');
-  await dialog.getByRole('checkbox').check();
+  await dialog.getByRole('checkbox', { name: /Plan it first/ }).check();
   await dialog.getByRole('button', { name: 'Send to First mate' }).click();
   await expect(dialog).toHaveCount(0);
   expect(home.inboxLog().at(-1)!.at(-1)).toMatch(/\nModel: haiku\nEffort: xhigh\nPlanning: yes$/);
@@ -698,6 +698,27 @@ test('New worker sends one request note to First mate', async () => {
   await row('__firstmate__').click();
   await expect(row('__firstmate__').locator('.unread')).toHaveCount(0);
   await page.screenshot({ path: path.join(SHOTS, 'first-mate-light.png') });
+});
+
+test('New worker can start a worker directly, with no First mate note', async () => {
+  home.makeProject('crew-chat');
+  const notesBefore = home.inboxNoteCount();
+  await page.getByRole('button', { name: 'New worker' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('combobox', { name: 'Project' }).selectOption('crew-chat');
+  await dialog.getByRole('textbox', { name: 'What should it do?' }).fill('Start this one directly.');
+  await dialog.getByRole('checkbox', { name: /Start it directly/ }).check();
+  await expect(dialog.getByRole('checkbox', { name: /Plan it first/ })).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Start worker' }).click();
+  await expect(dialog).toHaveCount(0);
+
+  // The start runs Firstmate's scripts only: the task is filed, the brief written, the worker spawned.
+  expect(home.inboxNoteCount()).toBe(notesBefore);
+  expect(home.spawnLog().at(-1)!.slice(1)).toEqual([path.join(home.home, 'projects', 'crew-chat'), '--mode', 'local-only', '--yolo', 'off']);
+  // It opens as a thread like any other worker.
+  await expect(page).toHaveURL(/#\/t\/direct-[0-9a-z]+$/);
+  const id = decodeURIComponent(new URL(page.url()).hash.replace('#/t/', ''));
+  await expect(row(id)).toBeVisible();
 });
 
 test('queued work has its own conversation for planning with First mate, and the worker carries it on', async () => {

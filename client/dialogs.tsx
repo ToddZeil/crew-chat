@@ -149,23 +149,28 @@ export function newWorkerNote(project: string, text: string, model: ModelChoice,
   return lines.join('\n');
 }
 
+type Failure = Pick<NoteResult, 'error' | 'exitCode' | 'stderr' | 'stdout'>;
+
 export function NewWorkerDialog({
   projects,
   onClose,
   onSent,
+  onStarted,
 }: {
   projects: { name: string; description: string }[];
   onClose: () => void;
   onSent: (r: NoteResult) => void;
+  onStarted: (id: string) => void;
 }) {
   const [project, setProject] = useState(projects[0]?.name ?? OTHER_PROJECT);
   const [text, setText] = useState('');
   const [model, setModel] = useState<ModelChoice>('auto');
   const [effort, setEffort] = useState<EffortChoice>('auto');
   const [planning, setPlanning] = useState(false);
+  const [direct, setDirect] = useState(false);
   const [rid, setRid] = useState(newRequestId);
   const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState<NoteResult | null>(null);
+  const [failure, setFailure] = useState<Failure | null>(null);
 
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
@@ -178,6 +183,13 @@ export function NewWorkerDialog({
   const submit = async () => {
     if (busy || !text.trim()) return;
     setBusy(true);
+    if (direct) {
+      const started = await api.startDirect({ project, text, model, effort });
+      setBusy(false);
+      if (started.ok && started.id) onStarted(started.id);
+      else setFailure(started);
+      return;
+    }
     const r = await api.sendNote(newWorkerNote(project, text, model, effort, planning), rid);
     setBusy(false);
     if (r.outcome === 'refused') setFailure(r);
@@ -199,7 +211,9 @@ export function NewWorkerDialog({
       >
         <h3 id="new-worker-title">Start a new worker</h3>
         <p className="hint">
-          This asks First mate to start one. The request shows as its own conversation under Queued right away, and the worker carries it on once it starts.
+          {direct
+            ? 'The worker starts now, with no First mate in the loop. It shows as its own conversation once it is running. Auto model and effort follow Firstmate\'s dispatch rules.'
+            : 'This asks First mate to start one. The request shows as its own conversation under Queued right away, and the worker carries it on once it starts.'}
         </p>
         <label className="field">
           <span>Project</span>
@@ -275,21 +289,38 @@ export function NewWorkerDialog({
         <label className="check-field">
           <input
             type="checkbox"
-            checked={planning}
+            checked={direct}
             onChange={(e) => {
-              setPlanning(e.target.checked);
+              setDirect(e.target.checked);
               setRid(newRequestId());
             }}
             disabled={busy}
           />
           <span>
-            <strong>Plan it first</strong>
-            <span className="hint"> Talk the approach over with First mate before any code is written. The request's own conversation is where that happens.</span>
+            <strong>Start it directly</strong>
+            <span className="hint"> Skip First mate. crew-chat files the task, writes its brief and starts the worker itself. It works on a local branch (no push, no PR), and its tool approvals stay on, so it may wait in its terminal for an answer.</span>
           </span>
         </label>
+        {!direct && (
+          <label className="check-field">
+            <input
+              type="checkbox"
+              checked={planning}
+              onChange={(e) => {
+                setPlanning(e.target.checked);
+                setRid(newRequestId());
+              }}
+              disabled={busy}
+            />
+            <span>
+              <strong>Plan it first</strong>
+              <span className="hint"> Talk the approach over with First mate before any code is written. The request's own conversation is where that happens.</span>
+            </span>
+          </label>
+        )}
         {failure && (
           <div className="notice notice-error" role="alert">
-            <strong>The request was not sent</strong>
+            <strong>{direct ? 'The worker was not started' : 'The request was not sent'}</strong>
             {failure.exitCode !== null && <span className="mono"> exit {failure.exitCode}</span>}
             {failureText && <pre className="notice-detail">{failureText}</pre>}
           </div>
@@ -299,7 +330,15 @@ export function NewWorkerDialog({
             Cancel
           </button>
           <button type="submit" className="btn primary" disabled={busy || !text.trim()}>
-            {busy ? 'Sending...' : failure ? 'Try again' : 'Send to First mate'}
+            {busy
+              ? direct
+                ? 'Starting...'
+                : 'Sending...'
+              : failure
+                ? 'Try again'
+                : direct
+                  ? 'Start worker'
+                  : 'Send to First mate'}
           </button>
         </div>
       </form>

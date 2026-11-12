@@ -121,6 +121,13 @@ if [ -f "$f" ]; then cat "$f"; else echo "state: unknown · source: none · stub
 `;
 
 const TASKS_STUB = `#!/usr/bin/env bash
+if [ "$1" = add ]; then
+  mkdir -p "$FM_HOME/tasks-add-log"
+  n=$(( $(find "$FM_HOME/tasks-add-log" -name '*.argv' | wc -l) + 1 ))
+  printf '%s\\0' "$@" > "$FM_HOME/tasks-add-log/$(printf %03d "$n").argv"
+  if [ -f "$FM_HOME/tasks-add-refuse" ]; then cat "$FM_HOME/tasks-add-refuse" >&2; exit 2; fi
+  exit 0
+fi
 if [ "$1" = list ]; then
   if [ -f "$FM_HOME/backlog-list.txt" ]; then cat "$FM_HOME/backlog-list.txt"
   else printf 'count: 0\\ntasks[0]{id,state,kind,repo,title,created,closed,held,hold_kind,hold_reason,blocked,blocked_by}:\\n'; fi
@@ -133,6 +140,66 @@ if [ -f "$f" ]; then
 else
   printf 'error: "Task \\\\"%s\\\\" not found in this backlog"\\ncode: NOT_FOUND\\n' "$2"
 fi
+`;
+
+// The three scripts that start a worker. fm-brief.sh writes the same template
+// shape as the real one; fm-spawn.sh refuses leftover placeholders the way the
+// real one does, and writes state/<id>.meta on success, so the worker is
+// discovered by the same listing as any other.
+const BRIEF_STUB = String.raw`#!/usr/bin/env bash
+set -euo pipefail
+[ -f "$FM_HOME/.fake-home" ] || { echo "stub refuses: FM_HOME is not a fake home" >&2; exit 90; }
+log="$FM_HOME/brief-log"
+mkdir -p "$log"
+n=$(( $(find "$log" -name '*.argv' | wc -l) + 1 ))
+printf '%s\0' "$@" > "$log/$(printf %03d "$n").argv"
+if [ -f "$FM_HOME/brief-refuse" ]; then cat "$FM_HOME/brief-refuse" >&2; exit 2; fi
+mkdir -p "$FM_HOME/data/$1"
+cat > "$FM_HOME/data/$1/brief.md" <<'EOF'
+# Task
+## Captain's intent
+{TASK}
+
+## Firstmate spec
+{FIRSTMATE_SPEC}
+EOF
+echo "scaffolded: $FM_HOME/data/$1/brief.md"
+`;
+
+const SPAWN_STUB = String.raw`#!/usr/bin/env bash
+set -euo pipefail
+[ -f "$FM_HOME/.fake-home" ] || { echo "stub refuses: FM_HOME is not a fake home" >&2; exit 90; }
+log="$FM_HOME/spawn-log"
+mkdir -p "$log"
+n=$(( $(find "$log" -name '*.argv' | wc -l) + 1 ))
+printf '%s\0' "$@" > "$log/$(printf %03d "$n").argv"
+id=$1
+project=$2
+shift 2
+mode= yolo=
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --mode) mode=$2; shift 2 ;;
+    --yolo) yolo=$2; shift 2 ;;
+    *) shift ;;
+  esac
+done
+if [ -f "$FM_HOME/spawn-refuse" ]; then cat "$FM_HOME/spawn-refuse" >&2; exit 1; fi
+if grep -q '{TASK}\|{FIRSTMATE_SPEC}' "$FM_HOME/data/$id/brief.md"; then echo "error: brief has leftover placeholders" >&2; exit 2; fi
+printf 'kind=ship\nproject=%s\nmode=%s\nyolo=%s\nwindow=stub:%s\n' "$(basename "$project")" "$mode" "$yolo" "$id" > "$FM_HOME/state/$id.meta"
+echo "spawned $id harness=claude kind=ship mode=$mode yolo=$yolo window=stub:$id"
+`;
+
+// Writes the record fm-dispatch-resolve.sh leaves beside the brief, from the
+// answer the test set; with no answer set, it leaves none.
+const DISPATCH_STUB = String.raw`#!/usr/bin/env bash
+set -euo pipefail
+[ -f "$FM_HOME/.fake-home" ] || { echo "stub refuses: FM_HOME is not a fake home" >&2; exit 90; }
+log="$FM_HOME/dispatch-log"
+mkdir -p "$log"
+n=$(( $(find "$log" -name '*.argv' | wc -l) + 1 ))
+printf '%s\0' "$@" > "$log/$(printf %03d "$n").argv"
+if [ -f "$FM_HOME/dispatch-answer" ]; then cp "$FM_HOME/dispatch-answer" "$(dirname "$1")/dispatch-resolution.json"; fi
 `;
 
 export interface WorkerSeed {
@@ -162,6 +229,9 @@ export class FakeHome {
       ['fm-tasks-axi.sh', TASKS_STUB],
       ['fm-teardown.sh', TEARDOWN_STUB],
       ['fm-inbox.sh', INBOX_STUB],
+      ['fm-brief.sh', BRIEF_STUB],
+      ['fm-spawn.sh', SPAWN_STUB],
+      ['fm-dispatch-resolve.sh', DISPATCH_STUB],
     ]) {
       const file = path.join(this.home, 'bin', name);
       writeFileSync(file, body);
@@ -304,6 +374,49 @@ ${body}
 
   teardownLog(): string[][] {
     return this.argvLog('teardown-log');
+  }
+
+  tasksAddLog(): string[][] {
+    return this.argvLog('tasks-add-log');
+  }
+
+  briefLog(): string[][] {
+    return this.argvLog('brief-log');
+  }
+
+  spawnLog(): string[][] {
+    return this.argvLog('spawn-log');
+  }
+
+  dispatchLog(): string[][] {
+    return this.argvLog('dispatch-log');
+  }
+
+  // A project clone under projects/, as Firstmate keeps them.
+  makeProject(name: string): void {
+    mkdirSync(path.join(this.home, 'projects', name), { recursive: true });
+  }
+
+  // Makes the home count as having dispatch rules, so a start must settle a profile.
+  enableDispatch(): void {
+    mkdirSync(path.join(this.home, 'config'), { recursive: true });
+    writeFileSync(path.join(this.home, 'config', 'crew-dispatch.json'), '{}\n');
+  }
+
+  setDispatchAnswer(record: unknown): void {
+    writeFileSync(path.join(this.home, 'dispatch-answer'), `${JSON.stringify(record)}\n`);
+  }
+
+  refuseTasksAdd(explanation: string): void {
+    writeFileSync(path.join(this.home, 'tasks-add-refuse'), explanation);
+  }
+
+  refuseBrief(explanation: string): void {
+    writeFileSync(path.join(this.home, 'brief-refuse'), explanation);
+  }
+
+  refuseSpawn(explanation: string): void {
+    writeFileSync(path.join(this.home, 'spawn-refuse'), explanation);
   }
 
   private argvLog(name: string): string[][] {
