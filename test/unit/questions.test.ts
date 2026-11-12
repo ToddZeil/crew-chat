@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { compileAnswer, formFilled } from '../../client/model.ts';
+import { alreadyClosed, compileAnswer, formFilled } from '../../client/model.ts';
 import { layoutDecision } from '../../client/layout.ts';
 import { asksApproval, decisionForm, questionRefs, inlineQuestions, letteredOptions, questionLabel, recommendation, reportQuestions } from '../../server/questions.ts';
 
@@ -188,5 +188,15 @@ describe('layoutDecision', () => {
   it('leaves short or already laid-out text alone', () => {
     expect(layoutDecision('Merge now?')).toBeNull();
     expect(layoutDecision(`${text}\nsecond line`)).toBeNull();
+  });
+});
+
+describe('alreadyClosed', () => {
+  it("recognises fm-send's refusal for a decision that is no longer open", () => {
+    const base = { ok: false, outcome: 'refused' as const, exitCode: 1, stdout: '' };
+    const stderr =
+      "error: --resolve-key 'k': no open decision or blocker with that key in /h/state/w.status, and no captain-held task 'k' or 'w-decision-k' still open (already closed or mistyped); nothing was sent.";
+    expect(alreadyClosed({ ...base, stderr })).toBe(true);
+    expect(alreadyClosed({ ...base, stderr: 'error: worker is gone' })).toBe(false);
   });
 });

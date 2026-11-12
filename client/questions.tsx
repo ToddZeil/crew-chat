@@ -5,7 +5,7 @@ import { DocContext } from './docs.tsx';
 import { RichText } from './format.tsx';
 import { layoutDecision } from './layout.ts';
 import { renderMarkdown } from './markdown.tsx';
-import { APPROVAL_CHOICES, compileAnswer, formFilled, loadJson, saveJson, type FormAnswers } from './model.ts';
+import { alreadyClosed, APPROVAL_CHOICES, compileAnswer, formFilled, loadJson, saveJson, type FormAnswers } from './model.ts';
 
 // Questions are prose, so a placeholder like <link> is text, not a tag the
 // sanitiser would drop. Code spans already show their text as written.
@@ -55,7 +55,7 @@ export function QuestionForm({
   threadId: string;
   decisionKey: string;
   readOnly: boolean;
-  addNotice: (tone: 'error', title: string, r: WriteResult) => void;
+  addNotice: (tone: 'error' | 'warning', title: string, r: WriteResult) => void;
 }) {
   const storeKey = `crew-chat:answers:${threadId}:${decisionKey}`;
   const [a, setA] = useState<FormAnswers>(() => ({ ...EMPTY, ...loadJson<Partial<FormAnswers>>(storeKey, {}) }));
@@ -75,17 +75,27 @@ export function QuestionForm({
   const filled = formFilled(form, a);
   const text = compileAnswer(form, a);
 
+  // A ref, not state, so a quick second click cannot send the answer twice
+  // before the button redraws as disabled.
+  const sending = useRef(false);
+  const [sent, setSent] = useState(false);
   const submit = async () => {
-    if (!filled || busy || readOnly) return;
+    if (!filled || sending.current || sent || readOnly) return;
+    sending.current = true;
     setBusy(true);
     const r = await api.answer(threadId, decisionKey, text);
+    sending.current = false;
     setBusy(false);
     if (r.ok) {
+      setSent(true);
       try {
         localStorage.removeItem(storeKey);
       } catch {
         // ignore
       }
+    } else if (alreadyClosed(r)) {
+      setSent(true);
+      addNotice('warning', 'This decision was already answered, so nothing was sent again', r);
     } else addNotice('error', 'Your answers were not sent', r);
   };
 
@@ -221,8 +231,8 @@ export function QuestionForm({
       )}
 
       <footer className="qform-foot">
-        <button type="button" className="btn primary" onClick={() => void submit()} disabled={!filled || busy || readOnly} title={readOnly ? 'Read-only mode' : undefined}>
-          {busy ? 'Sending...' : 'Send answers'}
+        <button type="button" className="btn primary" onClick={() => void submit()} disabled={!filled || busy || sent || readOnly} title={readOnly ? 'Read-only mode' : undefined}>
+          {busy ? 'Sending...' : sent ? 'Sent' : 'Send answers'}
         </button>
         <button type="button" className="btn ghost" onClick={() => setPreview(!preview)} disabled={!filled} aria-pressed={preview}>
           {preview ? 'Hide preview' : 'Preview'}

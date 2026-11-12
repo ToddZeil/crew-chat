@@ -4,7 +4,7 @@ import { api } from './api.ts';
 import { BADGE_LABELS, Collapsible, ExternalLink, formatTokens, imageMarker, RichText, verbLabel, verbTone } from './format.tsx';
 import { Avatar, MessageList, type Author, type Row } from './messages.tsx';
 import { isActive } from './Sidebar.tsx';
-import { loadJson, newRequestId, noteAsWrite, PENDING_TEXT, saveJson, threadTag, type Notice } from './model.ts';
+import { alreadyClosed, loadJson, newRequestId, noteAsWrite, PENDING_TEXT, saveJson, threadTag, type Notice } from './model.ts';
 import { Handoff } from './Handoff.tsx';
 import { layoutDecision } from './layout.ts';
 import { DecisionText, QuestionForm } from './questions.tsx';
@@ -806,13 +806,19 @@ function AnswerBox({
 }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  const sending = useRef(false);
   const submit = async () => {
-    if (!text.trim() || busy) return;
+    if (!text.trim() || sending.current) return;
+    sending.current = true;
     setBusy(true);
     const r = await api.answer(threadId, decisionKey, text);
+    sending.current = false;
     setBusy(false);
     if (r.ok) onDone();
-    else addNotice('error', 'Your answer was not sent', r);
+    else if (alreadyClosed(r)) {
+      addNotice('warning', 'This decision was already answered, so nothing was sent again', r);
+      onDone();
+    } else addNotice('error', 'Your answer was not sent', r);
   };
   return (
     <div className="answer-box">

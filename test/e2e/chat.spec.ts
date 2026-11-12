@@ -1242,7 +1242,10 @@ test('a decision with open questions lays them out one by one and sends them as 
   await form.evaluate((el) => el.scrollIntoView({ block: 'start' }));
   await page.screenshot({ path: path.join(SHOTS, 'decision-questions.png') });
 
-  await form.getByRole('button', { name: 'Send answers' }).click();
+  // A quick double click still sends once.
+  const sends = home.sendLog().length;
+  await form.getByRole('button', { name: 'Send answers' }).dblclick();
+  await expect.poll(() => home.sendLog().length).toBe(sends + 1);
   await expect.poll(() => home.sendLog().at(-1)).toEqual([
     'triage-plan',
     '--resolve-key',

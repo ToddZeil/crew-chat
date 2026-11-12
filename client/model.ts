@@ -126,3 +126,9 @@ export function compileAnswer(form: DecisionForm, a: FormAnswers): string {
 export function formFilled(form: DecisionForm, a: FormAnswers): boolean {
   return Boolean((form.approval && a.approval) || a.option || a.other.trim() || form.questions.some((q) => a.answers[q.n]?.trim()));
 }
+
+// fm-send refuses an answer to a decision that is no longer open; that is
+// usually a second send of the same answer, not a failure.
+export function alreadyClosed(r: WriteResult): boolean {
+  return /no open decision or blocker with that key|already closed or mistyped/.test(`${r.stderr}\n${r.stdout}\n${r.error ?? ''}`);
+}
