@@ -6,6 +6,7 @@ import { Avatar, MessageList, type Author, type Row } from './messages.tsx';
 import { isActive } from './Sidebar.tsx';
 import { alreadyClosed, loadJson, newRequestId, noteAsWrite, PENDING_TEXT, saveJson, threadTag, type Notice } from './model.ts';
 import { Handoff } from './Handoff.tsx';
+import { typedApproval } from './handoff.ts';
 import { layoutDecision } from './layout.ts';
 import { DecisionText, QuestionForm } from './questions.tsx';
 import { TerminalPanel } from './TerminalPanel.tsx';
@@ -422,9 +423,12 @@ export function ThreadView({
     return true;
   };
 
+  // Only First mate's newest request for a typed approval gets the hand-off
+  // button; older ones are history.
+  const handoffId = [...detail.items].reverse().find((i) => i.type === 'incoming' && i.author === 'firstmate' && typedApproval(i.text))?.id ?? null;
   const rows: Row[] = detail.items.map((item) =>
     item.type === 'incoming'
-      ? incomingRow(item, worker, readOnly, answering === item.id, setAnswering, t.id, addNotice)
+      ? incomingRow(item, worker, readOnly, answering === item.id, setAnswering, t.id, addNotice, handoffId === item.id)
       : outgoingRow(item),
   );
   // The first message that arrived since the thread was last read.
@@ -674,6 +678,7 @@ function incomingRow(
   setAnswering: (id: string | null) => void,
   threadId: string,
   addNotice: ThreadViewProps['addNotice'],
+  handoff = false,
 ): Row {
   if (item.author === 'firstmate') author = FIRST_MATE;
   const tone = verbTone(item.verb);
@@ -706,7 +711,7 @@ function incomingRow(
         ) : (
           <Collapsible text={item.text || '(no text)'} />
         )}
-        {item.author === 'firstmate' && <Handoff text={item.text} readOnly={readOnly} />}
+        {handoff && <Handoff text={item.text} readOnly={readOnly} />}
         {form && item.key && <QuestionForm form={form} threadId={threadId} decisionKey={item.key} readOnly={readOnly} addNotice={addNotice} />}
         {!form && item.decision === 'open' && item.key && !answering && (
           <div className="decision-actions">

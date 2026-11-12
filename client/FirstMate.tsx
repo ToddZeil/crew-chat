@@ -3,6 +3,7 @@ import type { FirstmateDetail, FirstmateNote, WriteResult } from '../shared/type
 import { api } from './api.ts';
 import { Collapsible } from './format.tsx';
 import { Handoff } from './Handoff.tsx';
+import { typedApproval } from './handoff.ts';
 import { Avatar, MessageList, type Row } from './messages.tsx';
 import { newRequestId, noteAsWrite, PENDING_TEXT, type Notice } from './model.ts';
 import { ComposerBox, FIRST_MATE, NoticeView, pendingRow, quoteInto, restoreDraft, YOU, type Pending } from './ThreadView.tsx';
@@ -70,6 +71,8 @@ export function FirstmateView({
     return true;
   };
 
+  // Only the newest request for a typed approval gets the hand-off button.
+  const handoffId = [...notes].reverse().find((n) => n.reply && typedApproval(n.reply.body))?.id ?? null;
   const rows: Row[] = [];
   for (const n of notes) {
     const receipt = noteReceipt(n);
@@ -100,7 +103,7 @@ export function FirstmateView({
         body: (
           <>
             <Collapsible text={n.reply.body} />
-            <Handoff text={n.reply.body} readOnly={readOnly} />
+            {n.id === handoffId && <Handoff text={n.reply.body} readOnly={readOnly} />}
           </>
         ),
       });
