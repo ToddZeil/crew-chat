@@ -219,6 +219,8 @@ export interface ClaudeLimits {
   sevenDay: number | null;
   // When the five-hour window resets (epoch ms), estimated from its countdown.
   resetsAt: number | null;
+  // When the weekly window resets, when the status bar shows it.
+  weekResetsAt: number | null;
   // The worker whose status bar it came from, and when it was read.
   from: string;
   at: number;

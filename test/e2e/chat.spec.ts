@@ -1153,13 +1153,16 @@ test('right-clicking a worker opens a menu of quick actions', async () => {
 });
 
 test('Claude plan usage from a worker status bar shows small under the token total', async () => {
-  tm('send-keys', '-t', 'crewtest:fm-search-sort', "clear; printf ' Opus | storefront | context: 20%% | 7d:42%% (85%% resets in 1h5m) \\$1.00\\n'", 'Enter');
-  await expect.poll(() => tm('capture-pane', '-p', '-t', 'crewtest:fm-search-sort')).toContain('resets in 1h5m');
+  tm('send-keys', '-t', 'crewtest:fm-search-sort', "clear; printf ' Opus | storefront | context: 20%% | 5h:85%% (resets in 1h5m) 7d:42%% (resets in 2d3h) \\$1.00\\n'", 'Enter');
+  await expect.poll(() => tm('capture-pane', '-p', '-t', 'crewtest:fm-search-sort')).toContain('resets in 2d3h');
   await page.reload();
   const usage = page.getByTestId('plan-usage');
   await expect(usage).toContainText('5h');
   await expect(usage).toContainText('85%');
-  await expect(usage).toContainText(/resets in 1h [45]m/);
+  await expect(usage.locator('.meter').first()).toContainText(/resets \d{1,2}:\d{2}/);
+  await expect(usage.locator('.meter').last()).toContainText(/resets [A-Z][a-z]{2} \d{1,2}:\d{2}/);
+  await expect(usage).toHaveAttribute('title', /5-hour window: 85% used, resets .+ \(in 1h [45]m\)/);
+  await expect(usage).toHaveAttribute('title', /7-day window: 42% used, resets .+ \(in 2d 3h\)/);
   await expect(usage).toContainText('7d');
   await expect(usage).toContainText('42%');
   await expect(usage.locator('.meter[data-level="high"]')).toHaveCount(1);

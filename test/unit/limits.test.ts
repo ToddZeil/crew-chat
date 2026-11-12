@@ -12,11 +12,21 @@ describe('parseStatusBar', () => {
       '\x1b[37m\x1b[43m 🐱 Opus 5.5 | crew-chat | context: 25% | 7d:86% (76% resets in 1h6m) $97.52 \x1b[39m\x1b[49m',
       '  ⏵⏵ bypass permissions on (shift+tab to cycle)',
     ].join('\n');
-    expect(parseStatusBar(screen, AT)).toEqual({ fiveHour: 76, sevenDay: 86, resetsAt: AT + (3600 + 360) * 1000, at: AT });
+    expect(parseStatusBar(screen, AT)).toEqual({ fiveHour: 76, sevenDay: 86, resetsAt: AT + (3600 + 360) * 1000, weekResetsAt: null, at: AT });
   });
 
   it('reads "5h:" and "week" labels, and a countdown in minutes only', () => {
-    expect(parseStatusBar('Sonnet | 5h: 12% | week 40% | resets in 45m', AT)).toEqual({ fiveHour: 12, sevenDay: 40, resetsAt: AT + 45 * 60_000, at: AT });
+    expect(parseStatusBar('Sonnet | 5h: 12% | week 40% | resets in 45m', AT)).toEqual({ fiveHour: 12, sevenDay: 40, resetsAt: AT + 45 * 60_000, weekResetsAt: null, at: AT });
+  });
+
+  it('gives each window its own reset when both are shown', () => {
+    expect(parseStatusBar('Opus | context: 25% | 5h:76% (resets in 0h6m) 7d:86% (resets in 2d3h) $9.00', AT)).toEqual({
+      fiveHour: 76,
+      sevenDay: 86,
+      resetsAt: AT + 6 * 60_000,
+      weekResetsAt: AT + (2 * 86_400 + 3 * 3600) * 1000,
+      at: AT,
+    });
   });
 
   it('ignores context percentages and usage text higher up the screen', () => {

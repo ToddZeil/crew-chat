@@ -26,7 +26,7 @@ crew-chat is an independent project. It is not part of Firstmate and is not main
   - Paste or drop images into a message.
   - Markdown and terminal tables are rendered.
   - Markdown files open in a side panel, and images open in a viewer.
-- **Usage.** Model, effort, context size, and token use for each worker, with a total for all workers. Claude plan usage (5-hour and 7-day windows, and when the 5-hour window resets) is shown under the total, read from the status bar of the most recently active Claude worker. It appears only if your Claude Code status line prints those figures, for example `7d:86% (76% resets in 0h6m)`.
+- **Usage.** Model, effort, context size, and token use for each worker, with a total for all workers. Claude plan usage (5-hour and 7-day windows, and when the 5-hour window resets) is shown under the total, read from the status bar of the most recently active Claude worker. It appears only if your Claude Code status line prints those figures, for example `5h:76% (resets in 0h6m) 7d:86% (resets in 2d3h)`; each window's reset time is shown when the status line includes it.
 - **Quick actions.** Right-click a worker in the sidebar, or use its ⋯ button, to open its conversation or terminal, jump to its open decision, star it, mark it read or unread, copy its name or link, or clean it up. Queued and requested work can be removed from the list or cancelled through First mate.
 - **Clean up.** Runs Firstmate's teardown for a worker. If the worker has unlanded changes, the reason is shown, and discarding them requires typing the worker's id.
 

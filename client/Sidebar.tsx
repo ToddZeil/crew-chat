@@ -321,7 +321,23 @@ function level(p: number): 'ok' | 'warn' | 'high' {
 
 function untilText(ms: number): string {
   const m = Math.max(0, Math.round(ms / 60_000));
+  const d = Math.floor(m / 1440);
+  if (d > 0) return `${d}d ${Math.floor((m % 1440) / 60)}h`;
   return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
+}
+
+// The clock time a window resets: "2:40 PM" today, else "Thu 9:00 AM".
+export function resetClock(at: number, now = Date.now()): string {
+  const d = new Date(at);
+  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return new Date(now).toDateString() === d.toDateString() ? time : `${d.toLocaleDateString([], { weekday: 'short' })} ${time}`;
+}
+
+function resetLine(at: number | null): { short: string; long: string } | null {
+  if (at === null) return null;
+  const left = at - Date.now();
+  if (left <= 0) return { short: 'reset due', long: 'reset due now' };
+  return { short: `resets ${resetClock(at)}`, long: `resets ${resetClock(at)} (in ${untilText(left)})` };
 }
 
 function Meter({ label, value, extra }: { label: string; value: number; extra?: string }) {
@@ -356,19 +372,21 @@ export function PlanUsage({ first }: { first: boolean }) {
     };
   }, []);
   if (!limits || (limits.fiveHour === null && limits.sevenDay === null)) return null;
-  const left = limits.resetsAt === null ? null : limits.resetsAt - Date.now();
-  const resets = left === null ? null : left > 0 ? `resets in ${untilText(left)}` : 'reset due';
+  const five = resetLine(limits.resetsAt);
+  const week = resetLine(limits.weekResetsAt ?? null);
   const title = [
     `Claude plan usage, from ${limits.from}'s status bar (read ${new Date(limits.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}).`,
-    limits.fiveHour !== null ? `5-hour window: ${Math.round(limits.fiveHour)}% used${resets ? `, ${resets}` : ''}.` : null,
-    limits.sevenDay !== null ? `7-day window: ${Math.round(limits.sevenDay)}% used.` : null,
+    limits.fiveHour !== null ? `5-hour window: ${Math.round(limits.fiveHour)}% used${five ? `, ${five.long}` : ''}.` : null,
+    limits.sevenDay !== null
+      ? `7-day window: ${Math.round(limits.sevenDay)}% used${week ? `, ${week.long}` : ". Its reset time is not in the status bar"}.`
+      : null,
   ]
     .filter(Boolean)
     .join('\n');
   return (
     <div className={first ? 'plan-usage first' : 'plan-usage'} data-testid="plan-usage" title={title} aria-label={title}>
-      {limits.fiveHour !== null && <Meter label="5h" value={limits.fiveHour} extra={resets ?? undefined} />}
-      {limits.sevenDay !== null && <Meter label="7d" value={limits.sevenDay} />}
+      {limits.fiveHour !== null && <Meter label="5h" value={limits.fiveHour} extra={five?.short} />}
+      {limits.sevenDay !== null && <Meter label="7d" value={limits.sevenDay} extra={week?.short} />}
     </div>
   );
 }
