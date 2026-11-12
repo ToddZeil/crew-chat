@@ -32,9 +32,11 @@ export function questionLabel(text: string): string {
   return plain.length > 140 ? `${plain.slice(0, 137)}...` : plain;
 }
 
+// Keeps the item's own line breaks, so a nested list still renders as one.
 function question(n: string, text: string): DecisionQuestion {
   const t = clean(text);
-  return { n, text: t, label: questionLabel(t), recommendation: recommendation(t) };
+  const md = text.trim().replace(/\n{3,}/g, '\n\n');
+  return { n, text: md, label: questionLabel(t), recommendation: recommendation(t) };
 }
 
 // Numbered items under a heading that names open questions, up to the next
@@ -57,7 +59,7 @@ export function reportQuestions(markdown: string): { heading: string; questions:
   let current: { n: string; parts: string[] } | null = null;
   let inFence = false;
   const flush = () => {
-    if (current) questions.push(question(current.n, current.parts.join(' ')));
+    if (current) questions.push(question(current.n, current.parts.join('\n')));
     current = null;
   };
   for (let i = start; i < lines.length; i++) {
@@ -70,8 +72,10 @@ export function reportQuestions(markdown: string): { heading: string; questions:
     if (item) {
       flush();
       current = { n: item[1], parts: [item[2]] };
-    } else if (current && line.trim() && /^\s/.test(line)) {
-      current.parts.push(line.trim());
+    } else if (current && !line.trim()) {
+      current.parts.push('');
+    } else if (current && /^\s/.test(line)) {
+      current.parts.push(line.replace(/^ {1,4}|^\t/, '').trimEnd());
     } else if (current && line.trim()) {
       // A non-indented paragraph ends the list item.
       flush();
@@ -126,17 +130,30 @@ function readReport(file: string): string | null {
   }
 }
 
+// Question numbers the decision points at: "Q7", "question 3", "questions 2 and 5".
+export function questionRefs(text: string): string[] {
+  const refs = new Set<string>();
+  for (const m of text.matchAll(/\bQ(\d{1,2})\b/g)) refs.add(String(Number(m[1])));
+  for (const m of text.matchAll(/\bquestions?\s+((?:\d{1,2}(?:\s*(?:,|and|&)\s*)?)+)/gi)) {
+    for (const n of m[1].match(/\d{1,2}/g) ?? []) refs.add(String(Number(n)));
+  }
+  return [...refs];
+}
+
 // Report questions are used only when the decision mentions questions, so an
-// unrelated old section never turns up under a simple yes/no decision.
+// unrelated old section never turns up under a simple yes/no decision. When it
+// names some by number, only those are still open.
 export function decisionForm(home: string, id: string, text: string): DecisionForm | null {
   const reportPath = path.join(home, 'data', id, 'report.md');
   let source: DecisionForm['source'] = null;
   let questions: DecisionQuestion[] = [];
-  if (/\bquestions?\b/i.test(text)) {
+  const refs = questionRefs(text);
+  if (refs.length || /\bquestions?\b/i.test(text)) {
     const md = readReport(reportPath);
     const found = md === null ? null : reportQuestions(md);
-    if (found) {
-      questions = found.questions;
+    const picked = found && refs.length ? found.questions.filter((q) => refs.includes(q.n)) : (found?.questions ?? []);
+    if (found && picked.length) {
+      questions = picked;
       source = { path: reportPath, heading: found.heading };
     }
   }

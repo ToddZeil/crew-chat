@@ -645,7 +645,16 @@ test('New worker sends one request note to First mate', async () => {
   await select.selectOption('crew-chat');
   await expect(dialog.getByRole('button', { name: 'Send to First mate' })).toBeDisabled();
   await expect(dialog.getByRole('combobox', { name: 'Model' })).toHaveValue('auto');
-  await expect(dialog.getByRole('combobox', { name: 'Effort' })).toHaveCount(0);
+  expect(await dialog.getByRole('combobox', { name: 'Model' }).locator('option').allTextContents()).toEqual(['Auto (First mate picks)', 'Haiku', 'Sonnet', 'Opus']);
+  await expect(dialog.getByRole('combobox', { name: 'Effort' })).toHaveValue('auto');
+  expect(await dialog.getByRole('combobox', { name: 'Effort' }).locator('option').allTextContents()).toEqual([
+    'Auto (First mate picks)',
+    'Low',
+    'Medium',
+    'High',
+    'Extra high',
+    'Max',
+  ]);
   await dialog.getByRole('textbox', { name: 'What should it do?' }).fill('Add a search box to the sidebar.');
   await dialog.getByRole('button', { name: 'Send to First mate' }).click();
   await expect(dialog).toHaveCount(0);
@@ -662,7 +671,7 @@ test('New worker sends one request note to First mate', async () => {
   await page.getByRole('button', { name: 'New worker' }).click();
   await dialog.getByRole('combobox', { name: 'Project' }).selectOption('storefront');
   await dialog.getByRole('combobox', { name: 'Model' }).selectOption('opus');
-  await expect(dialog.getByRole('combobox', { name: 'Effort' })).toHaveValue('high');
+  await dialog.getByRole('combobox', { name: 'Effort' }).selectOption('high');
   await dialog.getByRole('textbox', { name: 'What should it do?' }).fill('Speed up the search query.');
   await dialog.getByRole('button', { name: 'Send to First mate' }).click();
   await expect(dialog).toHaveCount(0);
@@ -671,13 +680,13 @@ test('New worker sends one request note to First mate', async () => {
   await expect(page.locator('.msg.out').last()).toContainText('Effort: high');
 
   await page.getByRole('button', { name: 'New worker' }).click();
-  await dialog.getByRole('combobox', { name: 'Model' }).selectOption('sonnet');
-  await dialog.getByRole('combobox', { name: 'Effort' }).selectOption('medium');
+  await dialog.getByRole('combobox', { name: 'Model' }).selectOption('haiku');
+  await dialog.getByRole('combobox', { name: 'Effort' }).selectOption('xhigh');
   await dialog.getByRole('textbox', { name: 'What should it do?' }).fill('Tidy the README.');
   await dialog.getByRole('checkbox').check();
   await dialog.getByRole('button', { name: 'Send to First mate' }).click();
   await expect(dialog).toHaveCount(0);
-  expect(home.inboxLog().at(-1)!.at(-1)).toMatch(/\nModel: sonnet\nEffort: medium\nPlanning: yes$/);
+  expect(home.inboxLog().at(-1)!.at(-1)).toMatch(/\nModel: haiku\nEffort: xhigh\nPlanning: yes$/);
   await expect(page.locator('.messages')).toContainText('You asked for a planning phase first');
   await expect(page.locator('.channel-head')).toContainText('planning first');
   await row('__firstmate__').click();
@@ -1088,6 +1097,23 @@ test('a decision with open questions lays them out one by one and sends them as 
   await expect(page.locator('#item-s0')).toHaveAttribute('data-decision', 'resolved');
   await expect(page.locator('#item-s0 .resolution')).toContainText('answered: Plan: Approved. Answers to the open questions in report.md: 1. Who can see the board? the whole team 3.');
   await expect(page.getByTestId('question-form')).toHaveCount(0);
+
+  // A follow-up that names the one question still open, packed into one long line.
+  home.appendStatus(
+    'triage-plan',
+    `needs-decision [key=plan-q2] [at=${now - 5}]: answers applied to report.md (whole team can see it; replies once with the link; approved as planned). Spike in a routine: db PASS, docx PASS, voice clips blocked. Only open call: Q2 history depth, which gates the first pull only.`,
+  );
+  const latest = page.locator('[data-decision="open"]');
+  await expect(latest.getByTestId('decision-text').locator('li')).toHaveText([
+    'whole team can see it',
+    'replies once with the link',
+    'approved as planned',
+    'db PASS',
+    'docx PASS',
+    'voice clips blocked',
+  ]);
+  await expect(latest.getByTestId('question')).toHaveCount(1);
+  await expect(latest.getByTestId('question')).toContainText('History depth');
 });
 
 test('a home with no workers shows an empty state', async ({ browser }) => {

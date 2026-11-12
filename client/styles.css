@@ -2741,3 +2741,20 @@ button.msg-image {
     padding-right: 12px;
   }
 }
+
+.decision-text .dt-para + .dt-para {
+  margin-top: 8px;
+}
+
+.dt-list {
+  margin: 4px 0 0;
+  padding-left: 22px;
+}
+
+.dt-list li {
+  margin: 2px 0;
+}
+
+.dt-list li::marker {
+  color: var(--text-3);
+}

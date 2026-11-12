@@ -2,6 +2,8 @@ import { useContext, useEffect, useRef, useState } from 'react';
 import type { DecisionForm, WriteResult } from '../shared/types.ts';
 import { api } from './api.ts';
 import { DocContext } from './docs.tsx';
+import { RichText } from './format.tsx';
+import { layoutDecision } from './layout.ts';
 import { renderMarkdown } from './markdown.tsx';
 import { APPROVAL_CHOICES, compileAnswer, formFilled, loadJson, saveJson, type FormAnswers } from './model.ts';
 
@@ -230,5 +232,29 @@ export function QuestionForm({
         </span>
       </footer>
     </section>
+  );
+}
+
+// A long one-line decision, shown as short paragraphs with its lists as bullets.
+export function DecisionText({ text }: { text: string }) {
+  const paras = layoutDecision(text);
+  if (!paras) return null;
+  return (
+    <div className="body decision-text" data-testid="decision-text">
+      {paras.map((p, i) => (
+        <div key={i} className="dt-para">
+          <RichText text={p.lead} />
+          {p.items.length > 0 && (
+            <ul className="dt-list">
+              {p.items.map((item, j) => (
+                <li key={j}>
+                  <RichText text={item} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }

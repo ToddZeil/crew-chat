@@ -58,7 +58,7 @@ function createdMs(task: BacklogTask): number | null {
 }
 
 const STOP = new Set(
-  'the and for from with that this into onto then than what when where which while have has had was were are can could should would will just also only make made check see about there their them they your yours our its it not but all any each new worker request project model effort planning auto yes'.split(' '),
+  'the and for from with that this into onto then than what when where which while have has had was were are can could should would will just also only make made check see about there their them they your yours our its it not but all any each new worker request project model effort planning auto yes haiku sonnet opus low medium high xhigh max'.split(' '),
 );
 
 export function words(text: string): Set<string> {

@@ -128,14 +128,23 @@ export function CleanupDialog({
 
 const OTHER_PROJECT = 'not sure';
 
-export type ModelChoice = 'auto' | 'sonnet' | 'opus';
-export type EffortChoice = 'medium' | 'high';
+export type ModelChoice = 'auto' | 'haiku' | 'sonnet' | 'opus';
+// The levels fm-spawn.sh --effort accepts for Claude workers.
+export const EFFORTS = [
+  ['auto', 'Auto (First mate picks)'],
+  ['low', 'Low'],
+  ['medium', 'Medium'],
+  ['high', 'High'],
+  ['xhigh', 'Extra high'],
+  ['max', 'Max'],
+] as const;
+export type EffortChoice = (typeof EFFORTS)[number][0];
 
-// The note First mate reads: the request, then the explicit model pick on its
-// own line, and the effort when a model was picked.
+// The note First mate reads: the request, then the model pick on its own
+// line, and the effort when one was picked.
 export function newWorkerNote(project: string, text: string, model: ModelChoice, effort: EffortChoice, planning: boolean): string {
   const lines = [`New worker request - project: ${project}. ${text.trim()}`, `Model: ${model}`];
-  if (model !== 'auto') lines.push(`Effort: ${effort}`);
+  if (effort !== 'auto') lines.push(`Effort: ${effort}`);
   lines.push(`Planning: ${planning ? 'yes' : 'no'}`);
   return lines.join('\n');
 }
@@ -152,7 +161,7 @@ export function NewWorkerDialog({
   const [project, setProject] = useState(projects[0]?.name ?? OTHER_PROJECT);
   const [text, setText] = useState('');
   const [model, setModel] = useState<ModelChoice>('auto');
-  const [effort, setEffort] = useState<EffortChoice>('high');
+  const [effort, setEffort] = useState<EffortChoice>('auto');
   const [planning, setPlanning] = useState(false);
   const [rid, setRid] = useState(newRequestId);
   const [busy, setBusy] = useState(false);
@@ -239,27 +248,29 @@ export function NewWorkerDialog({
               aria-label="Model"
             >
               <option value="auto">Auto (First mate picks)</option>
+              <option value="haiku">Haiku</option>
               <option value="sonnet">Sonnet</option>
               <option value="opus">Opus</option>
             </select>
           </label>
-          {model !== 'auto' && (
-            <label className="field">
-              <span>Effort</span>
-              <select
-                value={effort}
-                onChange={(e) => {
-                  setEffort(e.target.value as EffortChoice);
-                  setRid(newRequestId());
-                }}
-                disabled={busy}
-                aria-label="Effort"
-              >
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-              </select>
-            </label>
-          )}
+          <label className="field">
+            <span>Effort</span>
+            <select
+              value={effort}
+              onChange={(e) => {
+                setEffort(e.target.value as EffortChoice);
+                setRid(newRequestId());
+              }}
+              disabled={busy}
+              aria-label="Effort"
+            >
+              {EFFORTS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
         <label className="check-field">
           <input

@@ -5,7 +5,8 @@ import { BADGE_LABELS, Collapsible, ExternalLink, formatTokens, imageMarker, Ric
 import { Avatar, MessageList, type Author, type Row } from './messages.tsx';
 import { isActive } from './Sidebar.tsx';
 import { loadJson, newRequestId, noteAsWrite, PENDING_TEXT, saveJson, threadTag, type Notice } from './model.ts';
-import { QuestionForm } from './questions.tsx';
+import { layoutDecision } from './layout.ts';
+import { DecisionText, QuestionForm } from './questions.tsx';
 import { TerminalPanel } from './TerminalPanel.tsx';
 
 export const YOU: Author = { key: 'you', name: 'You', kind: 'you' };
@@ -666,7 +667,11 @@ function incomingRow(
     ),
     body: (
       <>
-        <Collapsible text={item.text || '(no text)'} />
+        {(item.verb === 'needs-decision' || item.verb === 'blocked') && layoutDecision(item.text) ? (
+          <DecisionText text={item.text} />
+        ) : (
+          <Collapsible text={item.text || '(no text)'} />
+        )}
         {form && item.key && <QuestionForm form={form} threadId={threadId} decisionKey={item.key} readOnly={readOnly} addNotice={addNotice} />}
         {!form && item.decision === 'open' && item.key && !answering && (
           <div className="decision-actions">

@@ -3,7 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { compileAnswer, formFilled } from '../../client/model.ts';
-import { asksApproval, decisionForm, inlineQuestions, letteredOptions, questionLabel, recommendation, reportQuestions } from '../../server/questions.ts';
+import { layoutDecision } from '../../client/layout.ts';
+import { asksApproval, decisionForm, questionRefs, inlineQuestions, letteredOptions, questionLabel, recommendation, reportQuestions } from '../../server/questions.ts';
 
 const REPORT = `# Plan
 
@@ -32,7 +33,14 @@ describe('reportQuestions', () => {
     const r = reportQuestions(REPORT);
     expect(r?.heading).toBe('Open questions for the captain');
     expect(r?.questions.map((q) => q.n)).toEqual(['1', '2', '3']);
-    expect(r?.questions[2].text).toBe('**Rubric:** is paying > trial > internal the right order, and should founders get a multiplier?');
+    expect(r?.questions[2].text).toBe('**Rubric:** is paying > trial > internal the right order,\nand should founders get a multiplier?');
+  });
+
+  it('keeps a nested list and a later paragraph inside one item', () => {
+    const md = '## Open questions\n\n7. **Builds**. To settle:\n   - the gate;\n   - the runner.\n\n   Phases 1 and 2 do not depend on it.\n\n## Next\n';
+    expect(reportQuestions(md)?.questions).toEqual([
+      { n: '7', text: '**Builds**. To settle:\n- the gate;\n- the runner.\n\nPhases 1 and 2 do not depend on it.', label: 'Builds', recommendation: null },
+    ]);
   });
 
   it('finds the suggestion in either form', () => {
@@ -139,5 +147,46 @@ describe('compileAnswer', () => {
     const f = { ...form, questions: [], approval: false, source: null, options: [{ label: 'A', text: 'move it' }, { label: 'B', text: 'keep it' }] };
     expect(compileAnswer(f, { approval: null, option: 'B', answers: {}, other: '' })).toBe('Choice: (B) keep it.');
     expect(formFilled(f, { approval: null, option: null, answers: {}, other: ' ' })).toBe(false);
+  });
+});
+
+describe('questionRefs', () => {
+  it('reads Q7 and "questions 2 and 5", and ignores counts', () => {
+    expect(questionRefs('Only open call: Q7 automatic builds')).toEqual(['7']);
+    expect(questionRefs('still open: questions 2 and 5')).toEqual(['2', '5']);
+    expect(questionRefs('Captain owes 9 open questions')).toEqual([]);
+  });
+});
+
+describe('decisionForm with numbered references', () => {
+  const home = mkdtempSync(path.join(os.tmpdir(), 'crew-chat-refs-'));
+  mkdirSync(path.join(home, 'data', 'w'), { recursive: true });
+  writeFileSync(path.join(home, 'data', 'w', 'report.md'), REPORT);
+  afterAll(() => rmSync(home, { recursive: true, force: true }));
+
+  it('shows only the questions the decision names, even without the word "question"', () => {
+    const f = decisionForm(home, 'w', "captain's answers applied. Only open call: Q2 history depth.");
+    expect(f?.questions.map((q) => q.n)).toEqual(['2']);
+  });
+});
+
+describe('layoutDecision', () => {
+  const text =
+    "captain's 9 answers applied to report.md (org-wide read; channel list from the wiki; 12-month backfill; silent in Slack). Spike in a cloud routine: db read+write PASS (25k-doc limit), docx PASS, Flutter installs but pub get blocked, Whisper blocked on huggingface.co. Only open call: Q7 automatic builds - gates Phase 3 only; Phases 0-2 are ready, e.g. the board. Leftovers: routine trig_01, artifact https://claude.ai/artifact/MZ9i3f";
+  it('splits sentences and turns packed lists into bullets', () => {
+    expect(layoutDecision(text)).toEqual([
+      { lead: "captain's 9 answers applied to report.md:", items: ['org-wide read', 'channel list from the wiki', '12-month backfill', 'silent in Slack'] },
+      {
+        lead: 'Spike in a cloud routine:',
+        items: ['db read+write PASS (25k-doc limit)', 'docx PASS', 'Flutter installs but pub get blocked', 'Whisper blocked on huggingface.co'],
+      },
+      { lead: 'Only open call: Q7 automatic builds - gates Phase 3 only; Phases 0-2 are ready, e.g. the board.', items: [] },
+      { lead: 'Leftovers: routine trig_01, artifact https://claude.ai/artifact/MZ9i3f', items: [] },
+    ]);
+  });
+
+  it('leaves short or already laid-out text alone', () => {
+    expect(layoutDecision('Merge now?')).toBeNull();
+    expect(layoutDecision(`${text}\nsecond line`)).toBeNull();
   });
 });
