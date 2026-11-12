@@ -142,6 +142,8 @@ test.beforeAll(async ({ browser }) => {
   delete tmuxEnv.TMUX;
   tm('new-session', '-d', '-s', 'crewtest', '-n', 'fm-search-sort');
   tm('new-window', '-d', '-t', 'crewtest:', '-n', 'fm-checkout-polish');
+  // Stands in for First mate's own window: an agent-like program (node), at index 2.
+  tm('new-window', '-d', '-t', 'crewtest:2', '-n', 'firstmate', process.execPath, '-e', "process.stdout.write('first-mate-screen-ok\\n'); setInterval(() => {}, 1 << 30)");
   uploadDir = mkdtempSync(path.join(os.tmpdir(), 'crewchat-e2e-uploads-'));
   projectsDir = mkdtempSync(path.join(os.tmpdir(), 'crewchat-e2e-claude-'));
   seedTranscript(projectsDir);
@@ -158,7 +160,7 @@ test.beforeAll(async ({ browser }) => {
     CREW_CHAT_LEDGER: ledgerFile,
     CREW_CHAT_ARCHIVE: path.join(uploadDir, 'archive'),
     // Stands in for First mate's own window, on the private tmux server.
-    CREW_CHAT_FIRSTMATE_WINDOW: 'crewtest:0',
+    CREW_CHAT_FIRSTMATE_WINDOW: 'crewtest:2',
     TMUX_TMPDIR: tmuxDir,
     TMUX: '',
   });
@@ -1193,10 +1195,35 @@ test("a First mate reply that asks for a typed approval copies the words and ope
     await expect.poll(() => readFileSync(terminalLog, 'utf8').trim().split('\n').filter(Boolean).length).toBe(before + 1);
     const command = JSON.parse(readFileSync(terminalLog, 'utf8').trim().split('\n').at(-1)!) as string;
     expect(command).toContain(`'new-session' '-t' '=crewtest' '-s' 'crewchat-firstmate-`);
-    expect(command).toMatch(/'select-window' '-t' '=crewchat-firstmate-[0-9a-f]{6}:0'/);
+    expect(command).toMatch(/'select-window' '-t' '=crewchat-firstmate-[0-9a-f]{6}:2'/);
     // Nothing is typed into First mate's terminal.
     expect(command).not.toContain('send-keys');
     await expect(p.locator('.msg', { hasText: 'Is phase 1 ready to go?' }).getByTestId('handoff')).toHaveCount(0);
+
+    // The First mate chat shows its terminal read-only beside the messages.
+    await p.getByTestId('terminal-view').click();
+    await p.getByRole('tab', { name: 'Screen' }).click();
+    await expect(p.getByTestId('pane-body')).toContainText('first-mate-screen-ok');
+    await p.getByRole('tab', { name: 'Transcript' }).click();
+    await expect(p.getByTestId('pane-reason')).toContainText("No Claude transcript was found for First mate's folder.");
+    await p.getByTestId('terminal-view').click();
+
+    // When that window holds only a shell, First mate runs in some other app:
+    // the button only copies, and nothing is opened.
+    tm('respawn-pane', '-k', '-t', 'crewtest:2', 'sh');
+    await p.reload();
+    const copyOnly = p.locator('[data-reply-to="note-approve"]').getByTestId('handoff');
+    await expect(copyOnly.getByRole('button', { name: 'Copy go on phase 1', exact: true })).toBeVisible();
+    await expect(copyOnly).toContainText("then paste it in First mate's terminal");
+    await p.evaluate(() => navigator.clipboard.writeText('something else'));
+    const opened = readFileSync(terminalLog, 'utf8').trim().split('\n').filter(Boolean).length;
+    await copyOnly.getByRole('button', { name: 'Copy go on phase 1', exact: true }).click();
+    await expect(copyOnly.getByRole('status')).toHaveText(`Copied "go on phase 1". Paste it in First mate's terminal and press Enter.`);
+    expect(await p.evaluate(() => navigator.clipboard.readText())).toBe('go on phase 1');
+    expect(readFileSync(terminalLog, 'utf8').trim().split('\n').filter(Boolean).length).toBe(opened);
+    await p.getByTestId('terminal-view').click();
+    await p.getByRole('tab', { name: 'Screen' }).click();
+    await expect(p.getByTestId('pane-reason')).toContainText(/is running (ba)?sh, not First mate/);
   } finally {
     await ctx.close();
   }

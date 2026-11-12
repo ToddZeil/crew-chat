@@ -351,6 +351,14 @@ export class Store extends EventEmitter {
     return { available: true, entries };
   }
 
+  // First mate's own sessions run in the Firstmate home itself.
+  firstmateActivity(): ActivityLog {
+    if (!this.usageReader) return { available: false, reason: 'Reading transcripts is off.', entries: [] };
+    const entries = this.usageReader.activity(this.home, null);
+    if (entries === null) return { available: false, reason: "No Claude transcript was found for First mate's folder.", entries: [] };
+    return { available: true, entries };
+  }
+
   private pollUsage(): void {
     const changed: string[] = [];
     for (const id of this.ids()) {

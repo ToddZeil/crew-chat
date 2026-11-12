@@ -3,9 +3,12 @@ import type { FirstmateDetail, FirstmateNote, WriteResult } from '../shared/type
 import { api } from './api.ts';
 import { Collapsible } from './format.tsx';
 import { Handoff } from './Handoff.tsx';
+import { FIRSTMATE_SOURCE, TerminalPanel } from './TerminalPanel.tsx';
 import { typedApproval } from './handoff.ts';
 import { Avatar, MessageList, type Row } from './messages.tsx';
-import { newRequestId, noteAsWrite, PENDING_TEXT, type Notice } from './model.ts';
+import { loadJson, newRequestId, noteAsWrite, PENDING_TEXT, saveJson, type Notice } from './model.ts';
+
+const FM_PANE_KEY = 'crewchat.fm-pane.v1';
 import { ComposerBox, FIRST_MATE, NoticeView, pendingRow, quoteInto, restoreDraft, YOU, type Pending } from './ThreadView.tsx';
 
 function noteReceipt(n: FirstmateNote): { text: string; title: string; read: boolean } {
@@ -44,6 +47,11 @@ export function FirstmateView({
 }) {
   const listRef = useRef<HTMLDivElement>(null);
   const [pending, setPending] = useState<Pending[]>([]);
+  const [paneOpen, setPaneOpen] = useState<boolean>(() => loadJson(FM_PANE_KEY, false));
+  const togglePane = (v: boolean) => {
+    setPaneOpen(v);
+    saveJson(FM_PANE_KEY, v);
+  };
   const draftRef = useRef(draft);
   draftRef.current = draft;
   const notes = fm?.notes ?? [];
@@ -129,9 +137,30 @@ export function FirstmateView({
           </div>
         </div>
         <div className="tabs">
-          <span className="tab on">Messages</span>
+          <button type="button" className={`tab${paneOpen ? '' : ' on'}`} onClick={() => togglePane(false)}>
+            <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true">
+              <path d="M4 4h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H9l-4 3v-3H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" fill="currentColor" />
+            </svg>
+            Messages
+          </button>
+          <button
+            type="button"
+            className={`tab${paneOpen ? ' on' : ''}`}
+            onClick={() => togglePane(!paneOpen)}
+            aria-pressed={paneOpen}
+            title="Show First mate's terminal next to the chat, read-only"
+            data-testid="terminal-view"
+          >
+            <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true">
+              <rect x="2.5" y="3.5" width="15" height="13" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+              <path d="m6 8 2.5 2L6 12m4 0h4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Terminal
+          </button>
         </div>
       </header>
+      <div className="conv-split">
+      <div className="conv-main">
       <div className="messages" ref={listRef}>
         {fm?.error && (
           <div className="notice notice-error" role="alert">
@@ -169,6 +198,9 @@ export function FirstmateView({
         readOnly={readOnly}
         placeholder="Message First mate"
       />
+      </div>
+      {paneOpen && <TerminalPanel id="__firstmate__" source={FIRSTMATE_SOURCE} onClose={() => togglePane(false)} />}
+      </div>
     </>
   );
 }

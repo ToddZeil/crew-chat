@@ -65,15 +65,29 @@ function useStickToBottom<E extends HTMLElement>(dep: unknown) {
 
 // What the worker's terminal shows, beside the chat: its session history from
 // the Claude transcript (scrollable), or the live screen from tmux.
-export function TerminalPanel({ id, onClose }: { id: string; onClose: () => void }) {
+export interface PaneSource {
+  pane: string;
+  activity: string;
+  // Who the terminal belongs to, in the notes: "the worker" or "First mate".
+  who: string;
+}
+
+export function workerSource(id: string): PaneSource {
+  const enc = encodeURIComponent(id);
+  return { pane: `/api/threads/${enc}/pane`, activity: `/api/threads/${enc}/activity`, who: 'the worker' };
+}
+
+export const FIRSTMATE_SOURCE: PaneSource = { pane: '/api/firstmate/pane', activity: '/api/firstmate/activity', who: 'First mate' };
+
+export function TerminalPanel({ id, onClose, source = workerSource(id) }: { id: string; onClose: () => void; source?: PaneSource }) {
   const [tab, setTab] = useState<Tab>(() => loadJson<Tab>(TAB_KEY, 'transcript'));
   const choose = (t: Tab) => {
     setTab(t);
     saveJson(TAB_KEY, t);
   };
-  const enc = encodeURIComponent(id);
-  const activity = usePoll<ActivityLog>(tab === 'transcript' ? `/api/threads/${enc}/activity` : null);
-  const screen = usePoll<PaneSnapshot>(tab === 'screen' ? `/api/threads/${enc}/pane` : null, SCREEN_POLL_MS);
+  const activity = usePoll<ActivityLog>(tab === 'transcript' ? source.activity : null);
+  const screen = usePoll<PaneSnapshot>(tab === 'screen' ? source.pane : null, SCREEN_POLL_MS);
+  const whose = source.who === 'the worker' ? "The worker's" : `${source.who}'s`;
   const live = tab === 'screen' ? screen.data?.available : activity.data?.available;
 
   return (
@@ -94,7 +108,7 @@ export function TerminalPanel({ id, onClose }: { id: string; onClose: () => void
       </header>
       {tab === 'transcript' ? (
         <>
-          <p className="pane-note">Everything the worker said, ran, and got back since it started. Scroll up for history.</p>
+          <p className="pane-note">Everything {source.who} said, ran, and got back{source.who === 'the worker' ? ' since it started' : ''}. Scroll up for history.</p>
           {activity.error && <div className="pane-reason">{activity.error}</div>}
           {activity.data && !activity.data.available ? (
             <div className="pane-reason" data-testid="pane-reason">
@@ -107,7 +121,7 @@ export function TerminalPanel({ id, onClose }: { id: string; onClose: () => void
       ) : (
         <>
           <p className="pane-note">
-            The worker's screen, live. Lines that scroll off the top stay here while this view is open, so you can scroll back.
+            {whose} screen, live and read-only. Lines that scroll off the top stay here while this view is open, so you can scroll back.
           </p>
           {screen.error && <div className="pane-reason">{screen.error}</div>}
           {screen.data && !screen.data.available ? (

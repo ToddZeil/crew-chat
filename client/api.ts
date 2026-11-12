@@ -1,4 +1,4 @@
-import type { AppConfig, ClaudeLimits, CleanupResult, FirstmateDetail, NoteResult, ThreadDetail, ThreadSummary, UploadResult, WriteResult } from '../shared/types.ts';
+import type { AppConfig, ClaudeLimits, TerminalAvailability, CleanupResult, FirstmateDetail, NoteResult, ThreadDetail, ThreadSummary, UploadResult, WriteResult } from '../shared/types.ts';
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { cache: 'no-store' });
@@ -59,6 +59,7 @@ export const api = {
     }
   },
   limits: async (): Promise<ClaudeLimits | null> => ((await (await fetch('/api/limits', { cache: 'no-store' })).json()) as { limits: ClaudeLimits | null }).limits,
+  firstmateTerminal: () => getJson<TerminalAvailability>('/api/firstmate/terminal'),
   openFirstmateTerminal: () => postJson('/api/firstmate/terminal', {}),
   setHidden: (id: string, hidden: boolean) => postJson(`/api/threads/${enc(id)}/hide`, { hidden }),
   openTerminal: (id: string) => postJson(`/api/threads/${enc(id)}/terminal`, {}),

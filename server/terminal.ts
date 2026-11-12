@@ -120,6 +120,11 @@ export async function availability(
   return { available: true };
 }
 
+// Claude Code shows up as "claude", "node", or its version number.
+export function looksLikeAgent(command: string): boolean {
+  return /claude|node|codex|^\d+\.\d+\.\d+/i.test(command.trim());
+}
+
 // Whether First mate's own tmux window exists, by name or index. Firstmate
 // finds its supervisor from the environment it runs in and records it nowhere
 // crew-chat can read, so the window comes from CREW_CHAT_FIRSTMATE_WINDOW or
@@ -129,20 +134,29 @@ export async function supervisorAvailability(tmux: TmuxConfig | null, value: str
   if (!target) return { available: false, reason: `"${value}" is not a tmux session:window. Set CREW_CHAT_FIRSTMATE_WINDOW.` };
   if (!tmux) return { available: false, reason: 'tmux is not installed or not on PATH.' };
   if (!canLaunch) return { available: false, reason: 'No terminal app to open it in. Set CREW_CHAT_TERMINAL_CMD.' };
-  const r = await run(tmux.bin, [...tmux.socketArgs, 'list-windows', '-t', `=${target.session}:`, '-F', '#{window_index}\t#{window_name}'], {
-    timeoutMs: 5_000,
-  });
+  const r = await run(
+    tmux.bin,
+    [...tmux.socketArgs, 'list-windows', '-t', `=${target.session}:`, '-F', '#{window_index}\t#{window_name}\t#{pane_current_command}'],
+    { timeoutMs: 5_000 },
+  );
   if (r.exitCode !== 0) {
     return { available: false, reason: `First mate's terminal was not found: no tmux session "${target.session}". If it runs elsewhere, set CREW_CHAT_FIRSTMATE_WINDOW.` };
   }
   const found = r.stdout
     .split('\n')
     .filter(Boolean)
-    .some((l) => {
-      const [index, name] = l.split('\t');
-      return /^\d+$/.test(target.window) ? index === target.window : name === target.window;
-    });
-  return found ? { available: true } : { available: false, reason: `First mate's terminal was not found: no window "${target.window}" in tmux session "${target.session}".` };
+    .map((l) => l.split('\t'))
+    .find(([index, name]) => (/^\d+$/.test(target.window) ? index === target.window : name === target.window));
+  if (!found) return { available: false, reason: `First mate's terminal was not found: no window "${target.window}" in tmux session "${target.session}".` };
+  // A window that only holds a shell is not First mate; opening it would send
+  // the captain to the wrong place.
+  if (!looksLikeAgent(found[2] ?? '')) {
+    return {
+      available: false,
+      reason: `tmux window ${value} is running ${found[2] || 'something else'}, not First mate, so First mate runs in another terminal app.`,
+    };
+  }
+  return { available: true };
 }
 
 // A read-only copy of what the worker's tmux window shows right now, with
@@ -154,7 +168,7 @@ export async function capturePane(
 ): Promise<{ ok: boolean; text: string; error?: string }> {
   const r = await run(
     tmux.bin,
-    [...tmux.socketArgs, 'capture-pane', '-p', '-J', '-e', '-t', `=${target.session}:=${target.window}`, '-S', `-${lines}`],
+    [...tmux.socketArgs, 'capture-pane', '-p', '-J', '-e', '-t', `=${target.session}:${windowRef(target.window)}`, '-S', `-${lines}`],
     { timeoutMs: 5_000 },
   );
   if (r.exitCode !== 0) return { ok: false, text: '', error: (r.stderr || r.error || 'capture failed').trim() };

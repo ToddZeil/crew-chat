@@ -396,6 +396,19 @@ export function createApp(opts: AppOptions): { server: http.Server; store: Store
       if (parts[1] === 'doc' && parts.length === 2 && req.method === 'GET') return json(res, 200, readDoc(url));
       if (parts[1] === 'image' && parts.length === 2 && req.method === 'GET') return serveImage(url, res);
       if (parts[1] === 'firstmate' && parts.length === 2 && req.method === 'GET') return json(res, 200, store.firstmate());
+      if (parts[1] === 'firstmate' && parts[2] === 'pane' && parts.length === 3 && req.method === 'GET') {
+        const where = opts.firstmateWindow ?? FIRSTMATE_WINDOW;
+        const at = Date.now();
+        const avail = await supervisorAvailability(opts.tmux, where);
+        const target = parseWindow(where);
+        if (!avail.available || !opts.tmux || !target) {
+          const reason = `${avail.reason ?? "First mate's terminal was not found."} Only a tmux terminal can be shown here; the Transcript tab shows First mate's session. If it runs in tmux elsewhere, set CREW_CHAT_FIRSTMATE_WINDOW.`;
+          return json(res, 200, { available: false, reason, text: '', at } satisfies PaneSnapshot);
+        }
+        const r = await capturePane(opts.tmux, target);
+        return json(res, 200, (r.ok ? { available: true, text: r.text, at } : { available: false, reason: `First mate's terminal could not be read (${r.error}).`, text: '', at }) satisfies PaneSnapshot);
+      }
+      if (parts[1] === 'firstmate' && parts[2] === 'activity' && parts.length === 3 && req.method === 'GET') return json(res, 200, store.firstmateActivity());
       if (parts[1] === 'firstmate' && parts[2] === 'terminal' && parts.length === 3) {
         const where = opts.firstmateWindow ?? FIRSTMATE_WINDOW;
         if (req.method === 'GET') return json(res, 200, await supervisorAvailability(opts.tmux, where, launch !== null));

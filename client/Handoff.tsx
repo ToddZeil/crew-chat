@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from './api.ts';
 import { typedApproval } from './handoff.ts';
 
@@ -34,6 +34,25 @@ export function Handoff({ text, readOnly }: { text: string; readOnly: boolean })
   const ask = typedApproval(text);
   const [note, setNote] = useState<{ tone: 'good' | 'warn'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  // Whether First mate's terminal can be opened from here; when it runs in
+  // another app the button only copies.
+  const [canOpen, setCanOpen] = useState<boolean | null>(null);
+  const [whyNot, setWhyNot] = useState<string | null>(null);
+  useEffect(() => {
+    if (!ask || readOnly) return;
+    let live = true;
+    void api.firstmateTerminal().then(
+      (a) => {
+        if (!live) return;
+        setCanOpen(a.available);
+        setWhyNot(a.available ? null : (a.reason ?? null));
+      },
+      () => live && setCanOpen(false),
+    );
+    return () => {
+      live = false;
+    };
+  }, [ask?.words, readOnly]);
   if (!ask) return null;
 
   const run = async () => {
@@ -46,6 +65,11 @@ export function Handoff({ text, readOnly }: { text: string; readOnly: boolean })
       return;
     }
     const lead = ask.words ? `Copied "${ask.words}".` : '';
+    if (canOpen === false) {
+      setBusy(false);
+      setNote({ tone: 'good', text: `${lead} Paste it in First mate's terminal and press Enter.`.trim() });
+      return;
+    }
     if (readOnly) {
       setNote({ tone: 'warn', text: `${lead} Read-only mode, so First mate's terminal was not opened.`.trim() });
       setBusy(false);
@@ -68,12 +92,18 @@ export function Handoff({ text, readOnly }: { text: string; readOnly: boolean })
         </svg>
         {ask.words ? (
           <>
-            Copy <code className="handoff-phrase">{ask.words}</code> and open First mate's terminal
+            Copy <code className="handoff-phrase">{ask.words}</code>
+            {canOpen === false ? '' : " and open First mate's terminal"}
           </>
         ) : (
           "Open First mate's terminal"
         )}
       </button>
+      {canOpen === false && ask.words && !note && (
+        <span className="handoff-hint" title={whyNot ?? undefined}>
+          then paste it in First mate's terminal
+        </span>
+      )}
       {note && (
         <span className={`handoff-note ${note.tone}`} role="status">
           {note.text}
