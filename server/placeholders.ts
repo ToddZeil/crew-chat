@@ -77,6 +77,22 @@ export function overlap(a: Set<string>, b: Set<string>): number {
   return n;
 }
 
+// Ticket keys such as ZL-793, lower-cased: a request that is only a Jira link
+// has no other words to match on.
+export function ticketKeys(text: string): Set<string> {
+  return new Set([...text.matchAll(/\b([A-Za-z][A-Za-z0-9]{1,9}-\d{1,6})\b/g)].map((m) => m[1].toLowerCase()));
+}
+
+// How strongly a request points at a task or worker: First mate's reply naming
+// it (or its branch) beats a shared ticket key, which beats shared words.
+export function linkScore(r: { text: string; reply: string | null }, c: { id: string; title: string }): number {
+  const id = c.id.toLowerCase();
+  if (r.reply && r.reply.toLowerCase().includes(id)) return 1000;
+  const hay = `${id} ${c.title.toLowerCase()}`;
+  for (const k of ticketKeys(r.text)) if (hay.includes(k)) return 500;
+  return overlap(words(r.text), words(c.title));
+}
+
 function sameProject(a: string, b: string): boolean {
   return a.toLowerCase() === b.toLowerCase();
 }
@@ -119,12 +135,11 @@ export function buildPlaceholders(
   for (const r of requests) {
     const at = r.note.at ?? 0;
     if (r.project === 'not sure') continue;
-    const want = words(r.text);
     let match: (typeof candidates)[number] | null = null;
     let best = 1;
     for (const c of candidates) {
       if (!sameProject(c.project, r.project) || c.from === null || c.from < at - DAY || byTask.has(c.id)) continue;
-      const score = overlap(want, words(c.title));
+      const score = linkScore({ text: r.text, reply: r.note.reply?.body ?? null }, c);
       if (score > best || (score === best && match && (c.from ?? 0) < (match.from ?? 0))) {
         best = score;
         match = c;
@@ -223,6 +238,13 @@ function statusItem(p: Placeholder, now: number): IncomingItem {
   };
 }
 
+// First mate's reply ends by asking the captain something: a question, or an
+// approval to type in its terminal.
+export function asksCaptain(reply: string): boolean {
+  const tail = reply.trim().slice(-400);
+  return /\?/.test(tail) || /\b(?:type|send)\s+["“'][^"”']+["”']\s+(?:in|into|there)\b/i.test(reply) || /\bwaiting on you\b|\bneeds your\b/i.test(tail);
+}
+
 export function placeholderSummary(p: Placeholder, notes: FirstmateNote[], now: number): ThreadSummary {
   const req = p.requests[0];
   const pick = req ? requestLines(req.text) : { model: null, effort: null, planning: false };
@@ -249,7 +271,9 @@ export function placeholderSummary(p: Placeholder, notes: FirstmateNote[], now: 
     lastVerb: lastReply ? 'reply' : null,
     lastAt,
     incomingCount: mine.filter((n) => n.reply).length,
-    openDecisions: 0,
+    // Counted like an open decision while First mate's newest word is a
+    // question nobody has answered yet.
+    openDecisions: lastReply?.reply && lastReply === last && (lastReply.reply.at ?? 0) >= (last.at ?? 0) && asksCaptain(lastReply.reply.body) ? 1 : 0,
     unreadByWorker: 0,
     terminal: { available: false, reason: 'No worker is running for this yet.' },
     harness: null,

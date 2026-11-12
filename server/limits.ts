@@ -41,6 +41,8 @@ export function parseStatusBar(screen: string, at: number): Omit<ClaudeLimits, '
       } else if (weekly) weekReset = reset;
       else fiveReset = reset;
     }
+    // A narrow pane cuts the bar short: "7d:97% (67% resets in …" still gives the 5h figure.
+    if (fiveHour === null) fiveHour = pct(/\((\d{1,3})(?:\.\d+)?%\s*resets?\b/i.exec(line)?.[1]);
     if (fiveHour === null && sevenDay === null) continue;
     if (fiveReset === null && weekReset === null) {
       const loose = LOOSE_RESET.exec(line);
@@ -56,6 +58,18 @@ export function parseStatusBar(screen: string, at: number): Omit<ClaudeLimits, '
       weekResetsAt: weekReset === null ? null : at + weekReset,
       at,
     };
+  }
+  return null;
+}
+
+// The session cost a status bar prints, e.g. "$23.90", from its bottom lines.
+export function parseCost(screen: string): number | null {
+  const lines = screen.replace(ANSI, '').split('\n');
+  while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+  for (const line of lines.slice(-8).reverse()) {
+    if (!/context|\d%|\|/.test(line)) continue;
+    const m = /\$(\d{1,6}(?:\.\d{1,2})?)\b/.exec(line);
+    if (m) return Number(m[1]);
   }
   return null;
 }

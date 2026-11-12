@@ -1,6 +1,12 @@
 import type { DecisionForm, NoteResult, ThreadSummary, WriteResult } from '../shared/types.ts';
 
 export const FIRSTMATE = '__firstmate__';
+export const USAGE = '__usage__';
+
+// The First mate and Usage pages are not worker threads.
+export function isThreadId(id: string | null): id is string {
+  return id !== null && id !== FIRSTMATE && id !== USAGE;
+}
 
 export interface Notice {
   id: number;
@@ -22,24 +28,27 @@ export function needsAttention(t: ThreadSummary): boolean {
   return t.badge === 'needs-you' || t.openDecisions > 0;
 }
 
-export type GroupKey = 'needs-you' | 'working' | 'queued' | 'done';
+export type GroupKey = 'needs-you' | 'working' | 'in-pr' | 'queued' | 'done';
 
 export const GROUPS: Array<{ key: GroupKey; label: string }> = [
   { key: 'needs-you', label: 'Needs you' },
   { key: 'working', label: 'Working' },
+  { key: 'in-pr', label: 'In PR' },
   { key: 'queued', label: 'Queued' },
   { key: 'done', label: 'Done / stopped' },
 ];
 
 export function groupOf(t: ThreadSummary): GroupKey {
   if (t.placeholder === 'finished') return 'done';
-  if (t.placeholder) return 'queued';
   if (needsAttention(t)) return 'needs-you';
+  if (t.placeholder) return 'queued';
+  // A live worker with a pull request open, whether still fixing it or waiting on review.
+  if (t.pr) return 'in-pr';
   if (t.badge === 'working' || t.badge === 'checking') return 'working';
   return 'done';
 }
 
-// Sections keep their order (Needs you, Working, Queued, Done / stopped);
+// Sections keep their order (Needs you, Working, In PR, Queued, Done / stopped);
 // inside each, the newest activity comes first.
 export function sortThreads(list: ThreadSummary[]): ThreadSummary[] {
   const order = (t: ThreadSummary) => GROUPS.findIndex((g) => g.key === groupOf(t));
@@ -48,6 +57,7 @@ export function sortThreads(list: ThreadSummary[]): ThreadSummary[] {
 
 export function idFromHash(): string | null {
   if (window.location.hash === '#/firstmate') return FIRSTMATE;
+  if (window.location.hash === '#/usage') return USAGE;
   const m = /^#\/t\/(.+)$/.exec(window.location.hash);
   return m ? decodeURIComponent(m[1]) : null;
 }

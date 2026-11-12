@@ -2,8 +2,8 @@ import { randomBytes } from 'node:crypto';
 import { createReadStream, existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import type { AppConfig, ClaudeLimits, CleanupResult, DocResult, NoteResult, PaneSnapshot, ThreadSummary, UploadResult, WriteResult } from '../shared/types.ts';
-import { parseStatusBar } from './limits.ts';
+import type { AppConfig, ClaudeLimits, CleanupResult, DocResult, NoteResult, PaneSnapshot, ThreadSummary, UploadResult, UsageReport, WriteResult } from '../shared/types.ts';
+import { parseCost, parseStatusBar } from './limits.ts';
 import { send, sendNote, teardown, validateText } from './fm.ts';
 import { missingScripts, REQUIRED_SCRIPTS } from './check.ts';
 import { SentLedger } from './ledger.ts';
@@ -14,6 +14,7 @@ const UPLOAD_NAME = /^[A-Za-z0-9-]+\.(png|jpg|gif|webp)$/;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_DOC_BYTES = 1024 * 1024;
 const LIMITS_MS = 30_000;
+const FIRSTMATE_USAGE_HOURS = 24;
 // Firstmate's own fallback for where the supervisor runs (bin/fm-supervisor-target-lib.sh).
 const FIRSTMATE_WINDOW = 'firstmate:0';
 
@@ -160,12 +161,26 @@ export function createApp(opts: AppOptions): { server: http.Server; store: Store
         .filter((t) => !t.placeholder && t.terminal.available && (t.harness ?? 'claude') === 'claude')
         .sort((a, b) => rank(a) - rank(b) || (b.lastAt ?? 0) - (a.lastAt ?? 0))
         .slice(0, 4);
+      // All workers share one account, so a figure one bar lacks (cut short by
+      // a narrow pane) is taken from the next.
+      let best: ClaudeLimits | null = null;
       for (const t of candidates) {
         const snap = await pane(t.id);
         const found = snap.available ? parseStatusBar(snap.text, snap.at) : null;
-        if (found) return { ...found, from: t.id };
+        if (!found) continue;
+        const prev = best as ClaudeLimits | null;
+        best = prev
+          ? {
+              ...prev,
+              fiveHour: prev.fiveHour ?? found.fiveHour,
+              sevenDay: prev.sevenDay ?? found.sevenDay,
+              resetsAt: prev.resetsAt ?? found.resetsAt,
+              weekResetsAt: prev.weekResetsAt ?? found.weekResetsAt,
+            }
+          : { ...found, from: t.id };
+        if (best.fiveHour !== null && best.sevenDay !== null && best.resetsAt !== null) break;
       }
-      return null;
+      return best;
     })();
     limitsCache = { at: Date.now(), value };
     return value;
@@ -368,6 +383,21 @@ export function createApp(opts: AppOptions): { server: http.Server; store: Store
     const route = async () => {
       if (parts[0] !== 'api') return serveStatic(req, res, url.pathname);
       if (req.method === 'GET' && parts[1] === 'limits' && parts.length === 2) return json(res, 200, { limits: await limits() });
+      if (req.method === 'GET' && parts[1] === 'usage' && parts.length === 2) {
+        const hours = FIRSTMATE_USAGE_HOURS;
+        const rows = store.usageRows(hours);
+        // Session cost comes from each live worker's status bar, when it prints one.
+        await Promise.all(
+          rows.map(async (r) => {
+            if (r.kind !== 'worker') return;
+            const t = store.summary(r.id);
+            if (!t?.terminal.available) return;
+            const snap = await pane(r.id);
+            if (snap.available) r.cost = parseCost(snap.text);
+          }),
+        );
+        return json(res, 200, { rows, firstmateHours: hours, at: Date.now() } satisfies UsageReport);
+      }
       if (req.method === 'GET' && parts[1] === 'config' && parts.length === 2) {
         const missing = missingScripts(store.home).map((script) => ({ script, needed: REQUIRED_SCRIPTS[script] }));
         return json(res, 200, { readOnly: opts.readOnly, home: store.home, uploadDir: path.resolve(opts.uploadDir), missing } satisfies AppConfig);

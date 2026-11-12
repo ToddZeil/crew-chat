@@ -29,6 +29,16 @@ describe('parseStatusBar', () => {
     });
   });
 
+  it('keeps the 5h figure when a narrow pane cuts the countdown short', () => {
+    expect(parseStatusBar('🐱 Sonnet 5.5 | app | context: 11% | 7d:97% (67% resets in …', AT)).toEqual({
+      fiveHour: 67,
+      sevenDay: 97,
+      resetsAt: null,
+      weekResetsAt: null,
+      at: AT,
+    });
+  });
+
   it('ignores context percentages and usage text higher up the screen', () => {
     const screen = ['7d:99% mentioned in a message', ...Array(10).fill(''), 'Opus | context: 57% | $1.00'].join('\n');
     expect(parseStatusBar(screen, AT)).toBeNull();

@@ -228,14 +228,15 @@ export function Sidebar({
         {threads !== null && threads.length > 0 && visible.length === 0 && <div className="side-empty">No worker matches "{filter}".</div>}
       </nav>
       {withUsage.length > 0 && (
-        <div
+        <a
           className="token-total"
+          href="#/usage"
           data-testid="token-total"
           title={withUsage.map((t) => `${t.id}: ${formatTokens(t.usage!.inputTokens + t.usage!.cacheReadTokens + t.usage!.outputTokens)}`).join('\n')}
         >
           <strong>{formatTokens(total)}</strong> tokens used, {formatTokens(totalOut)} output, across {withUsage.length} worker
           {withUsage.length === 1 ? '' : 's'}
-        </div>
+        </a>
       )}
       <PlanUsage first={withUsage.length === 0} />
       <footer className="sidebar-foot">

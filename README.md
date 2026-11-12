@@ -11,7 +11,7 @@ crew-chat is an independent project. It is not part of Firstmate and is not main
 
 ## Features
 
-- **One conversation per worker.** Status updates arrive as messages as they are written. Unread messages are marked, and conversations are grouped into *Needs you*, *Working*, *Queued*, and *Done / stopped*.
+- **One conversation per worker.** Status updates arrive as messages as they are written. Unread messages are marked, and conversations are grouped into *Needs you*, *Working*, *In PR* (a pull request is open), *Queued*, and *Done / stopped*. Queued work moves to *Needs you* while First mate's newest reply there asks you something.
 - **Decisions.** A worker's open decision shows an Answer button. The answer is delivered to the worker, and the decision is closed in Firstmate's records.
   - When a decision asks several questions, in its own text or in the "Open questions" section of the worker's report, they are listed one by one, each with its own answer field and the worker's suggestion where it gave one.
   - Plan approvals and lettered options such as (A) and (B) are shown as buttons.
@@ -26,7 +26,7 @@ crew-chat is an independent project. It is not part of Firstmate and is not main
   - Paste or drop images into a message.
   - Markdown and terminal tables are rendered.
   - Markdown files open in a side panel, and images open in a viewer.
-- **Usage.** Model, effort, context size, and token use for each worker, with a total for all workers. Claude plan usage (5-hour and 7-day windows, and when the 5-hour window resets) is shown under the total, read from the status bar of the most recently active Claude worker. It appears only if your Claude Code status line prints those figures, for example `5h:76% (resets in 0h6m) 7d:86% (resets in 2d3h)`; each window's reset time is shown when the status line includes it.
+- **Usage.** Model, effort, context size, and token use for each worker, with a total for all workers. The Usage page compares workers and First mate side by side (fresh input, cache reads, output, context, cost where the status bar shows it) and points out what drives the totals. Claude plan usage (5-hour and 7-day windows, and when the 5-hour window resets) is shown under the total, read from the status bar of the most recently active Claude worker. It appears only if your Claude Code status line prints those figures, for example `5h:76% (resets in 0h6m) 7d:86% (resets in 2d3h)`; each window's reset time is shown when the status line includes it.
 - **Quick actions.** Right-click a worker in the sidebar, or use its ⋯ button, to open its conversation or terminal, jump to its open decision, star it, mark it read or unread, copy its name or link, or clean it up. Queued and requested work can be removed from the list or cancelled through First mate.
 - **Clean up.** Runs Firstmate's teardown for a worker. If the worker has unlanded changes, the reason is shown, and discarding them requires typing the worker's id.
 

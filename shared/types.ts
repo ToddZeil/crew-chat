@@ -225,3 +225,24 @@ export interface ClaudeLimits {
   from: string;
   at: number;
 }
+
+export interface UsageRow {
+  id: string;
+  kind: 'worker' | 'firstmate';
+  title: string;
+  badge: string | null;
+  model: string | null;
+  effort: string | null;
+  usage: WorkerUsage | null;
+  // Where the counts start: the worker's spawn, or the start of First mate's window.
+  since: number | null;
+  // The session's cost in dollars, when its status bar prints one.
+  cost: number | null;
+}
+
+export interface UsageReport {
+  rows: UsageRow[];
+  // How far back First mate's row reaches.
+  firstmateHours: number;
+  at: number;
+}

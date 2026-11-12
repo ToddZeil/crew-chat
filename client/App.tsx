@@ -8,6 +8,8 @@ import { FirstmateView, type NoteDraft } from './FirstMate.tsx';
 import { setUploadDir } from './format.tsx';
 import {
   FIRSTMATE,
+  isThreadId,
+  USAGE,
   idFromHash,
   loadJson,
   newRequestId,
@@ -20,6 +22,7 @@ import {
 } from './model.ts';
 import { Sidebar, ThemeSwitch, type View } from './Sidebar.tsx';
 import { ContextMenu, type MenuEntry } from './menu.tsx';
+import { UsageView } from './UsageView.tsx';
 import { PANE_EVENT, ThreadView } from './ThreadView.tsx';
 
 const SEEN_KEY = 'crewchat.seen.v1';
@@ -147,7 +150,7 @@ export function App() {
       setLive(true);
       void refreshThreads();
       void refreshFirstmate();
-      if (selectedRef.current && selectedRef.current !== FIRSTMATE) void refreshDetail(selectedRef.current);
+      if (isThreadId(selectedRef.current)) void refreshDetail(selectedRef.current);
     };
     es.onerror = () => setLive(false);
     es.addEventListener('change', (ev) => {
@@ -156,7 +159,7 @@ export function App() {
       if (ids.some((i) => i !== FIRSTMATE)) void refreshThreads();
       const sel = selectedRef.current;
       // Notes and the backlog feed queued threads and the planning chat.
-      if (sel && sel !== FIRSTMATE && (ids.includes(sel) || ids.includes(FIRSTMATE) || ids.includes('__backlog__'))) void refreshDetail(sel);
+      if (isThreadId(sel) && (ids.includes(sel) || ids.includes(FIRSTMATE) || ids.includes('__backlog__'))) void refreshDetail(sel);
     });
     return () => es.close();
   }, [refreshThreads, refreshDetail, refreshFirstmate]);
@@ -171,7 +174,7 @@ export function App() {
 
   // Without a thread in the URL, open the one at the top of the list.
   useEffect(() => {
-    if (!threads || selected === FIRSTMATE) return;
+    if (!threads || selected === FIRSTMATE || selected === USAGE) return;
     if (selected && threads.some((t) => t.id === selected)) return;
     const first = sortThreads(threads.filter((t) => !t.hidden))[0];
     if (first) window.location.replace(`#/t/${encodeURIComponent(first.id)}`);
@@ -180,7 +183,7 @@ export function App() {
 
   useEffect(() => {
     setDetail(null);
-    if (selected && selected !== FIRSTMATE) void refreshDetail(selected);
+    if (isThreadId(selected)) void refreshDetail(selected);
   }, [selected, refreshDetail]);
 
   // How much of the thread had been read when it was opened, for the New
@@ -237,7 +240,7 @@ export function App() {
   const needsYou = sorted.find((t) => !t.placeholder && (t.badge === 'needs-you' || t.openDecisions > 0));
   const firstWorker = sorted.find((t) => !t.hidden);
   const unreadTotal = sorted.reduce((n, t) => n + unreadOf(t.id), 0) + fmUnread;
-  const selectedName = selected === FIRSTMATE ? 'First mate' : (selected ?? '');
+  const selectedName = selected === FIRSTMATE ? 'First mate' : selected === USAGE ? 'Usage' : (selected ?? '');
 
   // Like a team chat tab: "!" and a red badge on the icon when something
   // needs you, "*" when there is only unread news.
@@ -246,7 +249,7 @@ export function App() {
     document.title = `${prefix}${selectedName ? `${selectedName} - ` : ''}Firstmate crew`;
     setFavicon(attention > 0 ? 'alert' : unreadTotal > 0 ? 'unread' : 'none');
   }, [attention, unreadTotal, selectedName]);
-  const openDoc = (path: string) => setDoc({ path, thread: selected && selected !== FIRSTMATE ? selected : null });
+  const openDoc = (path: string) => setDoc({ path, thread: isThreadId(selected) ? selected : null });
 
   useEffect(() => {
     if (!detail || jumpTo.current !== detail.summary.id) return;
@@ -414,11 +417,11 @@ export function App() {
         </span>
         <button
           type="button"
-          className={`rail-item${selected !== FIRSTMATE && view === 'all' ? ' on' : ''}`}
+          className={`rail-item${isThreadId(selected) && view === 'all' ? ' on' : ''}`}
           title="All workers"
           onClick={() => {
             setView('all');
-            if (selected === FIRSTMATE && firstWorker) window.location.hash = `#/t/${encodeURIComponent(firstWorker.id)}`;
+            if (!isThreadId(selected) && firstWorker) window.location.hash = `#/t/${encodeURIComponent(firstWorker.id)}`;
           }}
         >
           <span className="rail-icon" aria-hidden="true">
@@ -454,6 +457,14 @@ export function App() {
           </span>
           <span className="rail-label">Activity</span>
         </button>
+        <a className={`rail-item${selected === USAGE ? ' on' : ''}`} href="#/usage" title="Token use by worker and First mate">
+          <span className="rail-icon" aria-hidden="true">
+            <svg viewBox="0 0 20 20" width="20" height="20">
+              <path d="M3.5 16.5h13M5.5 14V9.5m4 4.5V5m4 9v-6.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </span>
+          <span className="rail-label">Usage</span>
+        </a>
         <div className="rail-bottom">
           <button
             type="button"
@@ -527,7 +538,9 @@ export function App() {
             </button>
           </div>
         )}
-        {selected === FIRSTMATE ? (
+        {selected === USAGE ? (
+          <UsageView />
+        ) : selected === FIRSTMATE ? (
           <FirstmateView
             fm={fm}
             now={now}

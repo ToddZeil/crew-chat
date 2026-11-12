@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events';
 import { existsSync, lstatSync, readdirSync, readFileSync, watch, type FSWatcher } from 'node:fs';
 import path from 'node:path';
 import type {
+  UsageRow,
   ActivityLog,
   Badge,
   ChatItem,
@@ -349,6 +350,41 @@ export class Store extends EventEmitter {
     const entries = this.usageReader.activity(meta.worktree, spawnTime(meta));
     if (entries === null) return { available: false, reason: 'No transcript found for this worker yet.', entries: [] };
     return { available: true, entries };
+  }
+
+  // Token use for every live worker since it started, and for First mate
+  // (whose sessions all run in the home) over the last `hours`.
+  usageRows(hours: number): UsageRow[] {
+    const rows: UsageRow[] = [];
+    for (const id of this.ids()) {
+      const meta = this.meta(id);
+      if (!meta) continue;
+      const s = this.summary(id);
+      rows.push({
+        id,
+        kind: 'worker',
+        title: this.titles.get(id) ?? id,
+        badge: s?.badge ?? null,
+        model: meta.model ?? null,
+        effort: meta.effort ?? null,
+        usage: s?.usage ?? null,
+        since: spawnTime(meta),
+        cost: null,
+      });
+    }
+    const since = Date.now() - hours * 3600_000;
+    rows.push({
+      id: 'firstmate',
+      kind: 'firstmate',
+      title: 'First mate',
+      badge: null,
+      model: null,
+      effort: null,
+      usage: this.usageReader?.read(this.home, since) ?? null,
+      since,
+      cost: null,
+    });
+    return rows;
   }
 
   // First mate's own sessions run in the Firstmate home itself.

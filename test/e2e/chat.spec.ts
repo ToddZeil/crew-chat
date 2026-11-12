@@ -198,7 +198,9 @@ test('sidebar sorts by who needs you and shows a badge per thread', async () => 
   const group = (g: string) => page.locator(`[data-group="${g}"] .thread-row`).evaluateAll((els) => els.map((e) => e.getAttribute('data-thread-id')));
   expect(await group('needs-you')).toEqual(['search-sort']);
   expect(await group('working')).toEqual(['checkout-polish']);
-  expect(await group('done')).toEqual(['invoice-export', 'cache-race']);
+  // A worker with a pull request open has its own section.
+  expect(await group('in-pr')).toEqual(['invoice-export']);
+  expect(await group('done')).toEqual(['cache-race']);
   await expect(row('search-sort')).toHaveAttribute('data-badge', 'needs-you');
   await expect(row('search-sort').locator('.mention')).toHaveText('1');
   await expect(row('checkout-polish')).toHaveAttribute('data-badge', 'working');
@@ -707,9 +709,12 @@ test('queued work has its own conversation for planning with First mate, and the
     true,
     'Queued as search-cache-warmup. Planning first: how fresh must the cache be?',
   );
-  await expect(page.locator('[data-group="queued"] .thread-row[data-thread-id="search-cache-warmup"]')).toHaveCount(1);
+  // First mate's newest word is a question, so the queued thread waits on you.
+  await expect(page.locator('[data-group="needs-you"] .thread-row[data-thread-id="search-cache-warmup"]')).toHaveCount(1);
+  await expect(row('search-cache-warmup').locator('.mention')).toHaveText('1');
   await row('search-cache-warmup').click();
-  await expect(page.locator('.channel-head .badge')).toHaveText('Queued');
+  await expect(page).toHaveURL(/#\/t\/search-cache-warmup$/);
+  await expect(page.locator('.channel-head .badge')).toHaveText('Needs you');
   await expect(page.getByTestId('open-terminal')).toHaveCount(0);
   const msgs = page.locator('.messages');
   await expect(msgs).toContainText('Warm the search cache when the server starts.');
@@ -726,6 +731,8 @@ test('queued work has its own conversation for planning with First mate, and the
   // The stub logs its arguments before it writes the note, so wait for the note itself.
   await expect.poll(() => home.noteIdFor('[re: search-cache-warmup] Five minutes is fine.')).not.toBeNull();
   const id = home.noteIdFor('[re: search-cache-warmup] Five minutes is fine.')!;
+  // Once answered, it is back with the queued work.
+  await expect(page.locator('[data-group="queued"] .thread-row[data-thread-id="search-cache-warmup"]')).toHaveCount(1);
   home.replyToNote(id, 'Agreed, starting the worker now.', 950);
   await expect(msgs).toContainText('Agreed, starting the worker now.');
 
@@ -1227,6 +1234,17 @@ test("a First mate reply that asks for a typed approval copies the words and ope
   } finally {
     await ctx.close();
   }
+});
+
+test('the Usage page compares token use across workers and First mate', async () => {
+  await page.getByTestId('token-total').click();
+  await expect(page).toHaveURL(/#\/usage$/);
+  const usage = page.getByTestId('usage-page');
+  await expect(usage.locator('table')).toBeVisible();
+  await expect(usage.locator('tr[data-row="search-sort"]')).toBeVisible();
+  await expect(usage.locator('tr[data-row="firstmate"]')).toContainText('First mate');
+  await expect(usage).toContainText('Cache reads');
+  await page.goto(`${server.base}/#/t/search-sort`);
 });
 
 test('a decision with open questions lays them out one by one and sends them as one answer', async () => {
