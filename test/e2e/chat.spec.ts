@@ -1152,6 +1152,20 @@ test('right-clicking a worker opens a menu of quick actions', async () => {
   await expect(row('request-note-005')).not.toHaveClass(/hidden-row/);
 });
 
+test('Claude plan usage from a worker status bar shows small under the token total', async () => {
+  tm('send-keys', '-t', 'crewtest:fm-search-sort', "clear; printf ' Opus | storefront | context: 20%% | 7d:42%% (85%% resets in 1h5m) \\$1.00\\n'", 'Enter');
+  await expect.poll(() => tm('capture-pane', '-p', '-t', 'crewtest:fm-search-sort')).toContain('resets in 1h5m');
+  await page.reload();
+  const usage = page.getByTestId('plan-usage');
+  await expect(usage).toContainText('5h');
+  await expect(usage).toContainText('85%');
+  await expect(usage).toContainText(/resets in 1h [45]m/);
+  await expect(usage).toContainText('7d');
+  await expect(usage).toContainText('42%');
+  await expect(usage.locator('.meter[data-level="high"]')).toHaveCount(1);
+  await expect(usage).toHaveAttribute('title', /^Claude plan usage, from [a-z-]+'s status bar/);
+});
+
 test('a decision with open questions lays them out one by one and sends them as one answer', async () => {
   home.writeData(
     'triage-plan',

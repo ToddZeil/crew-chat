@@ -25,6 +25,7 @@ const { server, store } = createApp({
   ledgerFile: process.env.CREW_CHAT_LEDGER ?? null,
   archiveDir: process.env.CREW_CHAT_ARCHIVE ?? null,
   claudeProjectsDir: process.env.CREW_CHAT_CLAUDE_PROJECTS ?? null,
+  limitsMs: 0,
   launch: async (command) => {
     appendFileSync(log, `${JSON.stringify(command)}\n`);
     return { exitCode: 0, stderr: '' };

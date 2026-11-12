@@ -211,3 +211,15 @@ export interface UploadResult {
   url?: string;
   error?: string;
 }
+
+// Plan usage as the newest Claude worker's status bar showed it.
+export interface ClaudeLimits {
+  // Percent used of the five-hour and weekly windows.
+  fiveHour: number | null;
+  sevenDay: number | null;
+  // When the five-hour window resets (epoch ms), estimated from its countdown.
+  resetsAt: number | null;
+  // The worker whose status bar it came from, and when it was read.
+  from: string;
+  at: number;
+}

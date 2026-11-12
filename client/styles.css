@@ -2867,3 +2867,58 @@ button.msg-image {
   margin: 5px 0;
   background: var(--line);
 }
+
+/* Claude plan usage, under the token total. */
+.plan-usage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  padding: 0 16px 8px;
+  color: var(--text-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+
+.plan-usage.first {
+  padding-top: 8px;
+  border-top: 1px solid var(--side-line);
+}
+
+.meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.meter-label {
+  font-weight: 600;
+}
+
+.meter-bar {
+  display: inline-block;
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--side-line);
+  overflow: hidden;
+}
+
+.meter-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--good);
+}
+
+.meter[data-level='warn'] .meter-bar > span {
+  background: var(--highlight-bar);
+}
+
+.meter[data-level='high'] .meter-bar > span {
+  background: var(--bad);
+}
+
+.meter-extra {
+  opacity: 0.85;
+}

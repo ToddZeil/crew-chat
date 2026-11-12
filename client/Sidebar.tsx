@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { AppConfig, FirstmateDetail, ThreadSummary } from '../shared/types.ts';
+import type { AppConfig, ClaudeLimits, FirstmateDetail, ThreadSummary } from '../shared/types.ts';
+import { api } from './api.ts';
 import { BADGE_LABELS, formatTokens } from './format.tsx';
 import { Avatar } from './messages.tsx';
 import { FIRSTMATE, GROUPS, groupOf, loadJson, saveJson, type GroupKey } from './model.ts';
@@ -236,6 +237,7 @@ export function Sidebar({
           {withUsage.length === 1 ? '' : 's'}
         </div>
       )}
+      <PlanUsage first={withUsage.length === 0} />
       <footer className="sidebar-foot">
         {config?.readOnly && (
           <span className="ro" title="Started with CREW_CHAT_READ_ONLY=1">
@@ -307,6 +309,66 @@ function ChannelRow({ t, active, unread, onMenu }: { t: ThreadSummary; active: b
     >
       ⋯
     </button>
+    </div>
+  );
+}
+
+const LIMITS_POLL_MS = 30_000;
+
+function level(p: number): 'ok' | 'warn' | 'high' {
+  return p >= 80 ? 'high' : p >= 50 ? 'warn' : 'ok';
+}
+
+function untilText(ms: number): string {
+  const m = Math.max(0, Math.round(ms / 60_000));
+  return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
+}
+
+function Meter({ label, value, extra }: { label: string; value: number; extra?: string }) {
+  return (
+    <span className="meter" data-level={level(value)}>
+      <span className="meter-label">{label}</span>
+      <span className="meter-bar" aria-hidden="true">
+        <span style={{ width: `${Math.min(100, value)}%` }} />
+      </span>
+      <span className="meter-value">{Math.round(value)}%</span>
+      {extra && <span className="meter-extra">{extra}</span>}
+    </span>
+  );
+}
+
+// Claude plan usage (five-hour and weekly windows) as the newest Claude
+// worker's status bar shows it. Nothing shows when no status bar has it.
+export function PlanUsage({ first }: { first: boolean }) {
+  const [limits, setLimits] = useState<ClaudeLimits | null>(null);
+  useEffect(() => {
+    let live = true;
+    const load = () =>
+      void api.limits().then(
+        (l) => live && setLimits(l),
+        () => undefined,
+      );
+    load();
+    const timer = setInterval(load, LIMITS_POLL_MS);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, []);
+  if (!limits || (limits.fiveHour === null && limits.sevenDay === null)) return null;
+  const left = limits.resetsAt === null ? null : limits.resetsAt - Date.now();
+  const resets = left === null ? null : left > 0 ? `resets in ${untilText(left)}` : 'reset due';
+  const title = [
+    `Claude plan usage, from ${limits.from}'s status bar (read ${new Date(limits.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}).`,
+    limits.fiveHour !== null ? `5-hour window: ${Math.round(limits.fiveHour)}% used${resets ? `, ${resets}` : ''}.` : null,
+    limits.sevenDay !== null ? `7-day window: ${Math.round(limits.sevenDay)}% used.` : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+  return (
+    <div className={first ? 'plan-usage first' : 'plan-usage'} data-testid="plan-usage" title={title} aria-label={title}>
+      {limits.fiveHour !== null && <Meter label="5h" value={limits.fiveHour} extra={resets ?? undefined} />}
+      {limits.sevenDay !== null && <Meter label="7d" value={limits.sevenDay} />}
     </div>
   );
 }

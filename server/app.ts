@@ -2,7 +2,8 @@ import { randomBytes } from 'node:crypto';
 import { createReadStream, existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import type { AppConfig, CleanupResult, DocResult, NoteResult, PaneSnapshot, UploadResult, WriteResult } from '../shared/types.ts';
+import type { AppConfig, ClaudeLimits, CleanupResult, DocResult, NoteResult, PaneSnapshot, ThreadSummary, UploadResult, WriteResult } from '../shared/types.ts';
+import { parseStatusBar } from './limits.ts';
 import { send, sendNote, teardown, validateText } from './fm.ts';
 import { missingScripts, REQUIRED_SCRIPTS } from './check.ts';
 import { SentLedger } from './ledger.ts';
@@ -12,6 +13,7 @@ const IMAGE_TYPES: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 
 const UPLOAD_NAME = /^[A-Za-z0-9-]+\.(png|jpg|gif|webp)$/;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_DOC_BYTES = 1024 * 1024;
+const LIMITS_MS = 30_000;
 
 function inside(root: string, file: string): boolean {
   return file === root || file.startsWith(root + path.sep);
@@ -43,6 +45,8 @@ export interface AppOptions {
   // Opens the worker's terminal; defaults to the platform's terminal app.
   launch?: Launcher | null;
   store?: Store;
+  // How long one status-bar reading of plan usage is reused.
+  limitsMs?: number;
 }
 
 const MIME: Record<string, string> = {
@@ -137,6 +141,29 @@ export function createApp(opts: AppOptions): { server: http.Server; store: Store
     panes.set(id, p);
     setTimeout(() => panes.delete(id), 700);
     return p;
+  }
+
+  // Plan usage from the status bar of the most recently active Claude worker,
+  // read at most every LIMITS_MS however many pages ask.
+  let limitsCache: { at: number; value: Promise<ClaudeLimits | null> } | null = null;
+  function limits(): Promise<ClaudeLimits | null> {
+    if (limitsCache && Date.now() - limitsCache.at < (opts.limitsMs ?? LIMITS_MS)) return limitsCache.value;
+    const value = (async () => {
+      const rank = (t: ThreadSummary) => (t.badge === 'working' ? 0 : t.badge === 'needs-you' ? 1 : 2);
+      const candidates = store
+        .summaries()
+        .filter((t) => !t.placeholder && t.terminal.available && (t.harness ?? 'claude') === 'claude')
+        .sort((a, b) => rank(a) - rank(b) || (b.lastAt ?? 0) - (a.lastAt ?? 0))
+        .slice(0, 4);
+      for (const t of candidates) {
+        const snap = await pane(t.id);
+        const found = snap.available ? parseStatusBar(snap.text, snap.at) : null;
+        if (found) return { ...found, from: t.id };
+      }
+      return null;
+    })();
+    limitsCache = { at: Date.now(), value };
+    return value;
   }
 
   store.on('change', (ids: string[]) => {
@@ -335,6 +362,7 @@ export function createApp(opts: AppOptions): { server: http.Server; store: Store
     const parts = url.pathname.split('/').filter(Boolean);
     const route = async () => {
       if (parts[0] !== 'api') return serveStatic(req, res, url.pathname);
+      if (req.method === 'GET' && parts[1] === 'limits' && parts.length === 2) return json(res, 200, { limits: await limits() });
       if (req.method === 'GET' && parts[1] === 'config' && parts.length === 2) {
         const missing = missingScripts(store.home).map((script) => ({ script, needed: REQUIRED_SCRIPTS[script] }));
         return json(res, 200, { readOnly: opts.readOnly, home: store.home, uploadDir: path.resolve(opts.uploadDir), missing } satisfies AppConfig);
