@@ -377,7 +377,7 @@ export function createApp(opts: AppOptions): { server: http.Server; store: Store
         if (!sameOrigin(req)) return json(res, 403, refused('Cross-site request refused.'));
         if (!(req.headers['content-type'] ?? '').startsWith('application/json')) return json(res, 415, refused('Send JSON.'));
         if (opts.readOnly) return json(res, 403, refused('This crew-chat is running read-only.'));
-        if (!store.canHide || !store.isFinished(id)) return json(res, 409, refused('Only finished threads can be removed from the list.'));
+        if (!store.canHide || !store.canHideThread(id)) return json(res, 409, refused('Only finished, queued, or requested threads can be removed from the list.'));
         const body = (await readBody(req)) as { hidden?: unknown };
         store.setHidden(id, body.hidden !== false);
         return json(res, 200, { ok: true, outcome: 'sent', exitCode: 0, stdout: '', stderr: '' } satisfies WriteResult);

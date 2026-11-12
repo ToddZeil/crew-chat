@@ -27,6 +27,7 @@ crew-chat is an independent project. It is not part of Firstmate and is not main
   - Markdown and terminal tables are rendered.
   - Markdown files open in a side panel, and images open in a viewer.
 - **Usage.** Model, effort, context size, and token use for each worker, with a total for all workers.
+- **Quick actions.** Right-click a worker in the sidebar, or use its ⋯ button, to open its conversation or terminal, jump to its open decision, star it, mark it read or unread, copy its name or link, or clean it up. Queued and requested work can be removed from the list or cancelled through First mate.
 - **Clean up.** Runs Firstmate's teardown for a worker. If the worker has unlanded changes, the reason is shown, and discarding them requires typing the worker's id.
 
 ## Requirements

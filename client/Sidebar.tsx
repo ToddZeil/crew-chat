@@ -63,6 +63,7 @@ interface SidebarProps {
   starred: string[];
   view: View;
   setView: (v: View) => void;
+  onRowMenu: (t: ThreadSummary, x: number, y: number) => void;
 }
 
 export type View = 'all' | 'unreads';
@@ -82,6 +83,7 @@ export function Sidebar({
   starred,
   view,
   setView,
+  onRowMenu,
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => loadJson(COLLAPSE_KEY, {}));
   const [showHidden, setShowHidden] = useState(false);
@@ -212,7 +214,7 @@ export function Sidebar({
               {rows
                 .filter((t) => !isCollapsed || t.id === selected)
                 .map((t) => (
-                  <ChannelRow key={t.id} t={t} active={t.id === selected} unread={unreadOf(t.id)} />
+                  <ChannelRow key={t.id} t={t} active={t.id === selected} unread={unreadOf(t.id)} onMenu={(x, y) => onRowMenu(t, x, y)} />
                 ))}
               {hiddenCount > 0 && !isCollapsed && (
                 <button type="button" className="show-hidden" onClick={() => setShowHidden(!showHidden)}>
@@ -250,10 +252,21 @@ export function isActive(badge: string): boolean {
   return badge === 'working' || badge === 'needs-you';
 }
 
-function ChannelRow({ t, active, unread }: { t: ThreadSummary; active: boolean; unread: number }) {
+function ChannelRow({ t, active, unread, onMenu }: { t: ThreadSummary; active: boolean; unread: number; onMenu: (x: number, y: number) => void }) {
   const badge = t.openDecisions > 0 && t.badge !== 'needs-you' ? 'needs-you' : t.badge;
+  // The context-menu key and Shift+F10 report no pointer position, so the menu opens by the row.
+  const atRow = (el: Element, e: { clientX: number; clientY: number }) => {
+    if (e.clientX || e.clientY) return onMenu(e.clientX, e.clientY);
+    const r = el.getBoundingClientRect();
+    onMenu(r.left + 24, r.bottom);
+  };
   return (
+    <div className="row-wrap">
     <a
+      onContextMenu={(e) => {
+        e.preventDefault();
+        atRow(e.currentTarget, e);
+      }}
       className={`thread-row${active ? ' active' : ''}${unread > 0 ? ' unread-row' : ''}${t.hidden ? ' hidden-row' : ''}`}
       href={`#/t/${encodeURIComponent(t.id)}`}
       aria-current={active ? 'page' : undefined}
@@ -282,5 +295,18 @@ function ChannelRow({ t, active, unread }: { t: ThreadSummary; active: boolean; 
         )
       )}
     </a>
+    <button
+      type="button"
+      className="row-more"
+      aria-label={`More actions for ${t.id}`}
+      title="More actions"
+      onClick={(e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        onMenu(r.left, r.bottom + 2);
+      }}
+    >
+      ⋯
+    </button>
+    </div>
   );
 }

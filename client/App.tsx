@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppConfig, FirstmateDetail, ThreadDetail, ThreadSummary, WriteResult } from '../shared/types.ts';
 import { api } from './api.ts';
-import { CleanupDialog, NewWorkerDialog } from './dialogs.tsx';
+import { CancelDialog, CleanupDialog, NewWorkerDialog } from './dialogs.tsx';
 import { DocContext, DocViewer, ImageViewer } from './docs.tsx';
 import { isImagePath } from './blocks.ts';
 import { FirstmateView, type NoteDraft } from './FirstMate.tsx';
@@ -19,7 +19,8 @@ import {
   type Notice,
 } from './model.ts';
 import { Sidebar, ThemeSwitch, type View } from './Sidebar.tsx';
-import { ThreadView } from './ThreadView.tsx';
+import { ContextMenu, type MenuEntry } from './menu.tsx';
+import { PANE_EVENT, ThreadView } from './ThreadView.tsx';
 
 const SEEN_KEY = 'crewchat.seen.v1';
 
@@ -81,6 +82,7 @@ export function App() {
   const [noteDraft, setNoteDraft] = useState<NoteDraft>(() => ({ text: '', rid: newRequestId(), ridFor: null }));
   const [newWorkerOpen, setNewWorkerOpen] = useState(false);
   const [cleanupFor, setCleanupFor] = useState<ThreadSummary | null>(null);
+  const [cancelFor, setCancelFor] = useState<ThreadSummary | null>(null);
   const [filter, setFilter] = useState('');
   const [view, setView] = useState<View>('all');
   const [themeOpen, setThemeOpen] = useState(false);
@@ -93,6 +95,10 @@ export function App() {
       return next;
     });
   const [flash, setFlash] = useState<{ tone: 'good' | 'warning'; text: string; detail?: string } | null>(null);
+  const [menu, setMenu] = useState<{ t: ThreadSummary; x: number; y: number } | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
+  // A thread whose open decision should be scrolled to once it has loaded.
+  const jumpTo = useRef<string | null>(null);
   const now = useNow();
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
@@ -208,6 +214,13 @@ export function App() {
     });
   }, [threads, fm, fmReplies, selected]);
 
+  const markSeen = (id: string, count: number) =>
+    setSeen((prev) => {
+      const next = { ...prev, [id]: Math.max(0, count) };
+      saveJson(SEEN_KEY, next);
+      return next;
+    });
+
   const addNotice = (id: string, tone: Notice['tone'], title: string, result: WriteResult) =>
     setNotices((prev) => ({ ...prev, [id]: [...(prev[id] ?? []), { id: nextNoticeId(), tone, title, result }] }));
   const dismissNotice = (id: string, nid: number) =>
@@ -234,6 +247,133 @@ export function App() {
     setFavicon(attention > 0 ? 'alert' : unreadTotal > 0 ? 'unread' : 'none');
   }, [attention, unreadTotal, selectedName]);
   const openDoc = (path: string) => setDoc({ path, thread: selected && selected !== FIRSTMATE ? selected : null });
+
+  useEffect(() => {
+    if (!detail || jumpTo.current !== detail.summary.id) return;
+    jumpTo.current = null;
+    const open = detail.items.find((i) => i.type === 'incoming' && i.decision === 'open');
+    if (open) requestAnimationFrame(() => document.getElementById(`item-${open.id}`)?.scrollIntoView({ block: 'center' }));
+  }, [detail]);
+
+  const copy = (text: string, what: string) =>
+    void navigator.clipboard?.writeText(text).then(
+      () => setFlash({ tone: 'good', text: `Copied ${what}.` }),
+      () => setFlash({ tone: 'warning', text: `Could not copy ${what}.` }),
+    );
+
+  const setHidden = (t: ThreadSummary, hide: boolean) =>
+    void api.setHidden(t.id, hide).then((r) => {
+      if (!r.ok) return addNotice(t.id, 'error', 'Could not change the list', r);
+      void refreshThreads().then(() => {
+        if (hide && selectedRef.current === t.id) window.location.hash = '';
+      });
+    });
+
+  const workerMenu = (t: ThreadSummary): MenuEntry[] => {
+    const go = () => {
+      window.location.hash = `#/t/${encodeURIComponent(t.id)}`;
+    };
+    const live = !t.placeholder;
+    const isStarred = starred.includes(t.id);
+    const unread = unreadOf(t.id);
+    const entries: MenuEntry[] = [
+      { kind: 'heading', label: t.id },
+      { kind: 'item', label: 'Open conversation', onSelect: go },
+    ];
+    if (t.openDecisions > 0) {
+      entries.push({
+        kind: 'item',
+        label: t.openDecisions === 1 ? 'Go to the open decision' : `Go to the ${t.openDecisions} open decisions`,
+        onSelect: () => {
+          jumpTo.current = t.id;
+          if (selected === t.id && detail) setDetail({ ...detail });
+          else go();
+        },
+      });
+    }
+    if (live) {
+      entries.push(
+        {
+          kind: 'item',
+          label: 'Show terminal beside the chat',
+          onSelect: () => {
+            saveJson('crewchat.pane.v1', true);
+            window.dispatchEvent(new Event(PANE_EVENT));
+            go();
+          },
+        },
+        {
+          kind: 'item',
+          label: 'Open terminal window',
+          disabled: readOnly || !t.terminal.available,
+          hint: readOnly ? 'Read-only mode' : t.terminal.available ? undefined : (t.terminal.reason ?? 'No terminal for this worker'),
+          onSelect: () =>
+            void api.openTerminal(t.id).then((r) => {
+              if (!r.ok) addNotice(t.id, 'error', 'Could not open the terminal', r);
+            }),
+        },
+      );
+    }
+    entries.push(
+      { kind: 'separator' },
+      { kind: 'item', label: isStarred ? 'Unstar' : 'Star', onSelect: () => toggleStar(t.id) },
+      unread > 0 || t.id === selected
+        ? {
+            kind: 'item',
+            label: 'Mark as read',
+            disabled: unread === 0,
+            onSelect: () => markSeen(t.id, t.incomingCount),
+          }
+        : {
+            kind: 'item',
+            label: 'Mark as unread',
+            disabled: t.incomingCount === 0,
+            onSelect: () => markSeen(t.id, t.incomingCount - 1),
+          },
+      { kind: 'separator' },
+      { kind: 'item', label: 'Copy name', onSelect: () => copy(t.id, 'the name') },
+      { kind: 'item', label: 'Copy link to conversation', onSelect: () => copy(`${window.location.origin}/#/t/${encodeURIComponent(t.id)}`, 'the link') },
+    );
+    if (t.pr) entries.push({ kind: 'item', label: 'Open pull request', onSelect: () => window.open(t.pr!, '_blank', 'noopener,noreferrer') });
+    if (t.placeholder === 'queued' || t.placeholder === 'requested') {
+      entries.push(
+        { kind: 'separator' },
+        {
+          kind: 'item',
+          label: t.hidden ? 'Show in the list again' : 'Remove from the list',
+          hint: "Only crew-chat's view changes; First mate still has it",
+          disabled: readOnly,
+          onSelect: () => setHidden(t, !t.hidden),
+        },
+        { kind: 'item', label: 'Ask First mate to cancel...', danger: true, disabled: readOnly, onSelect: () => setCancelFor(t) },
+      );
+    }
+    if (t.placeholder === 'finished') {
+      entries.push(
+        { kind: 'separator' },
+        {
+          kind: 'item',
+          label: t.hidden ? 'Show in the list again' : 'Remove from the list',
+          onSelect: () => setHidden(t, !t.hidden),
+        },
+      );
+    }
+    if (live) {
+      entries.push(
+        { kind: 'separator' },
+        {
+          kind: 'item',
+          label: 'Clean up...',
+          danger: true,
+          disabled: readOnly,
+          hint: readOnly ? 'Read-only mode' : 'Asks before anything is removed',
+          onSelect: () => setCleanupFor(t),
+        },
+      );
+    }
+    return entries;
+  };
+
   return (
     <DocContext.Provider value={openDoc}>
     <div className="shell">
@@ -365,6 +505,7 @@ export function App() {
         starred={starred}
         view={view}
         setView={setView}
+        onRowMenu={(t, x, y) => setMenu({ t, x, y })}
       />
       <main className="thread">
         {config && config.missing.length > 0 && (
@@ -409,6 +550,7 @@ export function App() {
             addNotice={(tone, title, r) => addNotice(selected, tone, title, r)}
             dismissNotice={(nid) => dismissNotice(selected, nid)}
             onCleanup={() => setCleanupFor(detail.summary)}
+            onCancel={() => setCancelFor(detail.summary)}
             starred={starred.includes(selected)}
             onToggleStar={() => toggleStar(selected)}
             newFrom={openedAt?.id === selected ? openedAt.seen : null}
@@ -432,6 +574,22 @@ export function App() {
         )}
       </main>
       </div>
+      {menu && <ContextMenu x={menu.x} y={menu.y} label={`Actions for ${menu.t.id}`} entries={workerMenu(menu.t)} onClose={closeMenu} />}
+      {cancelFor && (
+        <CancelDialog
+          t={cancelFor}
+          onClose={() => setCancelFor(null)}
+          onSent={(r, hide) => {
+            const t = cancelFor;
+            setCancelFor(null);
+            if (r.outcome === 'pending') addNotice(t.id, 'warning', PENDING_TEXT, noteAsWrite(r));
+            void refreshFirstmate();
+            if (hide) setHidden(t, true);
+            else void refreshDetail(t.id);
+            setFlash({ tone: 'good', text: `Asked First mate to cancel ${t.title}.` });
+          }}
+        />
+      )}
       {newWorkerOpen && (
         <NewWorkerDialog
           projects={fm?.projects ?? []}

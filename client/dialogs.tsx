@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { CleanupResult, NoteResult, ThreadSummary } from '../shared/types.ts';
 import { api } from './api.ts';
-import { newRequestId } from './model.ts';
+import { newRequestId, threadTag } from './model.ts';
 
 type CleanupStep = 'confirm' | 'running' | 'refused' | 'forcing' | 'error';
 
@@ -303,6 +303,87 @@ export function NewWorkerDialog({
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+// The note that asks First mate to drop work that has no worker yet. crew-chat
+// cannot cancel it itself: the backlog and the request belong to First mate.
+export function cancelNote(t: Pick<ThreadSummary, 'id' | 'title' | 'placeholder'>, reason: string): string {
+  const why = reason.trim() ? ` Reason: ${reason.trim()}` : '';
+  return t.placeholder === 'queued'
+    ? `Please cancel the queued task ${t.id} ("${t.title}"): do not start a worker for it, and close it in the backlog.${why}`
+    : `Please cancel this request ("${t.title}"): do not start a worker for it.${why}`;
+}
+
+export function CancelDialog({
+  t,
+  onClose,
+  onSent,
+}: {
+  t: ThreadSummary;
+  onClose: () => void;
+  onSent: (r: NoteResult, hide: boolean) => void;
+}) {
+  const [reason, setReason] = useState('');
+  const [hide, setHide] = useState(true);
+  const [rid] = useState(newRequestId);
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<NoteResult | null>(null);
+
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape' && !busy) onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [busy, onClose]);
+
+  const send = async () => {
+    setBusy(true);
+    const r = await api.sendNote(`${threadTag(t.id)}${cancelNote(t, reason)}`, rid);
+    setBusy(false);
+    if (r.outcome === 'refused') setFailure(r);
+    else onSent(r, hide);
+  };
+  const failureText = failure ? [failure.error, failure.stderr.trim(), failure.stdout.trim()].filter(Boolean).join('\n') : '';
+
+  return (
+    <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && !busy && onClose()}>
+      <div className="dialog" role="dialog" aria-modal="true" aria-labelledby="cancel-title">
+        <h3 id="cancel-title">Cancel {t.title}?</h3>
+        <p>
+          {t.placeholder === 'queued' ? (
+            <>
+              This asks First mate to drop <code>{t.id}</code>: no worker is started for it, and it is closed in the backlog.
+            </>
+          ) : (
+            <>This asks First mate not to start a worker for this request.</>
+          )}{' '}
+          crew-chat sends the request; First mate makes the change.
+        </p>
+        <label className="field">
+          <span>Reason (optional)</span>
+          <textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} disabled={busy} aria-label="Reason" placeholder="For example: no longer needed" />
+        </label>
+        <label className="check-field">
+          <input type="checkbox" checked={hide} onChange={(e) => setHide(e.target.checked)} disabled={busy} />
+          <span>Also remove it from my list now</span>
+        </label>
+        {failure && (
+          <pre className="dialog-output" data-testid="cancel-output">
+            {failureText || 'First mate did not take the note.'}
+          </pre>
+        )}
+        <div className="dialog-actions">
+          <button type="button" className="btn ghost" onClick={onClose} disabled={busy}>
+            Keep it
+          </button>
+          <button type="button" className="btn danger" onClick={() => void send()} disabled={busy} autoFocus>
+            {busy ? 'Sending...' : 'Ask First mate to cancel'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

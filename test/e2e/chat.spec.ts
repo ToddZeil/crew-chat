@@ -1034,6 +1034,124 @@ test('the theme menu on the rail picks light or dark over the system setting, an
   await q.close();
 });
 
+test('right-clicking a worker opens a menu of quick actions', async () => {
+  await row('search-sort').click();
+  await expect(page.locator('.channel-head')).toContainText('search-sort');
+
+  // Right-click a row that is not open: mark it unread, then read again.
+  const unreadBefore = await row('checkout-polish').locator('.unread').count();
+  expect(unreadBefore).toBe(0);
+  await row('checkout-polish').click({ button: 'right' });
+  const menu = page.getByRole('menu', { name: 'Actions for checkout-polish' });
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('menuitem')).toHaveText([
+    'Open conversation',
+    'Show terminal beside the chat',
+    'Open terminal window',
+    'Star',
+    'Mark as unread',
+    'Copy name',
+    'Copy link to conversation',
+    'Clean up...',
+  ]);
+  await expect(menu.getByRole('menuitem').first()).toBeFocused();
+  await menu.getByRole('menuitem', { name: 'Mark as unread' }).click();
+  await expect(menu).toHaveCount(0);
+  await expect(row('checkout-polish').locator('.unread')).toHaveText('1');
+  await row('checkout-polish').click({ button: 'right' });
+  await menu.getByRole('menuitem', { name: 'Mark as read' }).click();
+  await expect(row('checkout-polish').locator('.unread')).toHaveCount(0);
+
+  // Escape and a click elsewhere both close it.
+  await row('checkout-polish').click({ button: 'right' });
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('menuitem', { name: 'Show terminal beside the chat' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await row('checkout-polish').click({ button: 'right' });
+  await page.locator('.messages').click({ position: { x: 5, y: 5 } });
+  await expect(menu).toHaveCount(0);
+
+  // Star from the menu, through the hover button this time.
+  await row('search-sort').hover();
+  await page.getByRole('button', { name: 'More actions for search-sort' }).click();
+  const own = page.getByRole('menu', { name: 'Actions for search-sort' });
+  await own.getByRole('menuitem', { name: 'Star', exact: true }).click();
+  await expect(page.locator('[data-group="starred"] .thread-row[data-thread-id="search-sort"]')).toHaveCount(1);
+  await row('search-sort').click({ button: 'right' });
+  await own.getByRole('menuitem', { name: 'Unstar' }).click();
+  await expect(page.locator('[data-group="starred"]')).toHaveCount(0);
+
+  // Terminal beside the chat, for the thread that is already open.
+  await expect(page.getByRole('tab', { name: 'Screen' })).toHaveCount(0);
+  await row('search-sort').click({ button: 'right' });
+  await own.getByRole('menuitem', { name: 'Show terminal beside the chat' }).click();
+  await expect(page.getByRole('tab', { name: 'Screen' })).toBeVisible();
+  await page.getByTestId('terminal-view').click();
+  await expect(page.getByRole('tab', { name: 'Screen' })).toHaveCount(0);
+
+  // Open terminal window runs the same launcher as the header button.
+  const before = readFileSync(terminalLog, 'utf8').trim().split('\n').filter(Boolean).length;
+  await row('search-sort').click({ button: 'right' });
+  await own.getByRole('menuitem', { name: 'Open terminal window' }).click();
+  await expect.poll(() => readFileSync(terminalLog, 'utf8').trim().split('\n').filter(Boolean).length).toBe(before + 1);
+
+  // A finished thread offers removing it from the list instead of terminals.
+  await row('invoice-export').click({ button: 'right' });
+  const done = page.getByRole('menu', { name: 'Actions for invoice-export' });
+  await expect(done.getByRole('menuitem', { name: 'Remove from the list' })).toBeVisible();
+  await expect(done.getByRole('menuitem', { name: 'Open terminal window' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+
+  // A worker with no tmux session cannot open one, and says why.
+  home.add({
+    id: 'lost-session',
+    title: 'A worker whose tmux session is gone',
+    meta: { window: 'lost-session:fm-lost', kind: 'ship' },
+    crewState: 'state: unknown · source: none · backend target gone: lost-session:fm-lost',
+    status: [`working [at=${now - 50}]: started`],
+  });
+  await row('lost-session').click({ button: 'right' });
+  const gone = page.getByRole('menu', { name: 'Actions for lost-session' });
+  await expect(gone.getByRole('menuitem', { name: 'Open terminal window' })).toBeDisabled();
+  await expect(gone.getByRole('menuitem', { name: 'Open terminal window' })).toHaveAttribute('title', 'The tmux session "lost-session" is not running.');
+
+  // Clean up asks first, as from the header; Cancel runs nothing.
+  const teardowns = home.teardownLog().length;
+  await gone.getByRole('menuitem', { name: 'Clean up...' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toContainText('lost-session');
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  expect(home.teardownLog().length).toBe(teardowns);
+
+  // Queued or requested work can be cancelled through First mate, and taken off the list.
+  await row('request-note-005').click({ button: 'right' });
+  const req = page.getByRole('menu', { name: 'Actions for request-note-005' });
+  await expect(req.getByRole('menuitem', { name: 'Open terminal window' })).toHaveCount(0);
+  await req.getByRole('menuitem', { name: 'Ask First mate to cancel...' }).click();
+  const cancel = page.getByRole('dialog');
+  await expect(cancel).toContainText('This asks First mate not to start a worker for this request.');
+  await cancel.getByRole('button', { name: 'Keep it' }).click();
+  await expect(cancel).toHaveCount(0);
+  const notes = home.inboxLog().length;
+  await row('request-note-005').click({ button: 'right' });
+  await req.getByRole('menuitem', { name: 'Ask First mate to cancel...' }).click();
+  await cancel.getByRole('textbox', { name: 'Reason' }).fill('no longer needed');
+  await cancel.getByRole('button', { name: 'Ask First mate to cancel' }).click();
+  await expect(cancel).toHaveCount(0);
+  await expect.poll(() => home.inboxLog().length).toBe(notes + 1);
+  expect(home.inboxLog().at(-1)!.at(-1)).toMatch(/^\[re: request-note-005\] Please cancel this request \(".+"\): do not start a worker for it\. Reason: no longer needed$/);
+  // Removed rows stay out of sight unless "Show removed" is on, as it was left by an earlier test.
+  const hiddenFlag = async () =>
+    ((await (await page.request.get(`${server.base}/api/threads`)).json()) as { id: string; hidden?: boolean }[]).find((x) => x.id === 'request-note-005')?.hidden ?? false;
+  await expect.poll(hiddenFlag).toBe(true);
+  await expect(row('request-note-005')).toHaveClass(/hidden-row/);
+  await row('request-note-005').click({ button: 'right' });
+  await req.getByRole('menuitem', { name: 'Show in the list again' }).click();
+  await expect.poll(hiddenFlag).toBe(false);
+  await expect(row('request-note-005')).not.toHaveClass(/hidden-row/);
+});
+
 test('a decision with open questions lays them out one by one and sends them as one answer', async () => {
   home.writeData(
     'triage-plan',

@@ -317,6 +317,7 @@ interface ThreadViewProps {
   addNotice: (tone: Notice['tone'], title: string, r: WriteResult) => void;
   dismissNotice: (id: number) => void;
   onCleanup: () => void;
+  onCancel: () => void;
   onHidden: (hidden: boolean) => void;
   starred: boolean;
   onToggleStar: () => void;
@@ -334,6 +335,7 @@ export function ThreadView({
   addNotice,
   dismissNotice,
   onCleanup,
+  onCancel,
   onHidden,
   starred,
   onToggleStar,
@@ -349,6 +351,12 @@ export function ThreadView({
     setPaneOpen(v);
     saveJson('crewchat.pane.v1', v);
   };
+  // The sidebar menu can open the terminal for the thread already showing.
+  useEffect(() => {
+    const sync = () => setPaneOpen(loadJson('crewchat.pane.v1', false));
+    window.addEventListener(PANE_EVENT, sync);
+    return () => window.removeEventListener(PANE_EVENT, sync);
+  }, []);
   // Messages handed to the send script that it has not answered yet. They
   // show at once, so the box can clear without waiting for the script.
   const [pending, setPending] = useState<Pending[]>([]);
@@ -462,6 +470,31 @@ export function ThreadView({
             {t.pr && <ExternalLink url={t.pr} />}
           </div>
         </div>
+        {(t.placeholder === 'queued' || t.placeholder === 'requested') && (
+          <div className="head-actions">
+            <div className="head-buttons">
+              <button
+                type="button"
+                className="btn"
+                disabled={readOnly}
+                data-testid="hide-thread"
+                title="Remove this from the list. Only crew-chat's view changes; First mate still has it."
+                onClick={() => {
+                  const hide = !t.hidden;
+                  void api.setHidden(t.id, hide).then((r) => {
+                    if (r.ok) onHidden(hide);
+                    else addNotice('error', 'Could not change the list', r);
+                  });
+                }}
+              >
+                {t.hidden ? 'Put back in the list' : 'Remove from list'}
+              </button>
+              <button type="button" className="btn danger-outline" disabled={readOnly} data-testid="cancel-request" onClick={onCancel}>
+                Cancel...
+              </button>
+            </div>
+          </div>
+        )}
         {t.placeholder === 'finished' && (
           <div className="head-actions">
             <div className="head-buttons">
@@ -698,6 +731,8 @@ function incomingRow(
     ),
   };
 }
+
+export const PANE_EVENT = 'crewchat-pane';
 
 export interface Pending {
   key: string;

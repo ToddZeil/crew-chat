@@ -198,6 +198,19 @@ export class Store extends EventEmitter {
     return !this.isLive(id) && this.finished(this.built()).has(id);
   }
 
+  // Finished threads, and queued or requested work that has no worker yet.
+  canHideThread(id: string): boolean {
+    if (this.isLive(id)) return false;
+    const built = this.built();
+    return built.placeholders.some((p) => p.id === id) || this.finished(built).has(id);
+  }
+
+  private withHidden<T extends { summary: ThreadSummary } | ThreadSummary>(id: string, x: T): T {
+    if (!this.archive?.hidden().has(id)) return x;
+    if ('summary' in x) return { ...x, summary: { ...x.summary, hidden: true } };
+    return { ...x, hidden: true };
+  }
+
   setHidden(id: string, hide: boolean): void {
     this.archive?.setHidden(id, hide);
     this.emit('change', [id]);
@@ -531,7 +544,7 @@ export class Store extends EventEmitter {
     const built = this.built();
     return [
       ...live,
-      ...built.placeholders.map((p) => placeholderSummary(p, this.notes, now)),
+      ...built.placeholders.map((p) => this.withHidden(p.id, placeholderSummary(p, this.notes, now))),
       ...[...this.finished(built).values()].map((d) => d.summary),
     ];
   }
@@ -541,7 +554,7 @@ export class Store extends EventEmitter {
     const built = this.built();
     if (meta === null) {
       const p = built.placeholders.find((x) => x.id === id);
-      return p ? placeholderDetail(p, this.notes, Date.now()) : (this.finished(built).get(id) ?? null);
+      return p ? this.withHidden(p.id, placeholderDetail(p, this.notes, Date.now())) : (this.finished(built).get(id) ?? null);
     }
     const incoming = this.incoming(id, meta);
     for (const item of incoming) if (item.decision === 'open' && item.key) item.form = decisionForm(this.home, id, item.text);
