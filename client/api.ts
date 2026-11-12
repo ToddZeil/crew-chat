@@ -59,6 +59,7 @@ export const api = {
     }
   },
   limits: async (): Promise<ClaudeLimits | null> => ((await (await fetch('/api/limits', { cache: 'no-store' })).json()) as { limits: ClaudeLimits | null }).limits,
+  openFirstmateTerminal: () => postJson('/api/firstmate/terminal', {}),
   setHidden: (id: string, hidden: boolean) => postJson(`/api/threads/${enc(id)}/hide`, { hidden }),
   openTerminal: (id: string) => postJson(`/api/threads/${enc(id)}/terminal`, {}),
   cleanup: async (id: string, confirmId?: string): Promise<CleanupResult> => {

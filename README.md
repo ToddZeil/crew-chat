@@ -20,7 +20,7 @@ crew-chat is an independent project. It is not part of Firstmate and is not main
   - **Transcript** shows the worker's session history (Claude Code workers).
   - **Screen** mirrors its live terminal, with scrollback.
   - **Open terminal** opens the worker's tmux window in a new terminal.
-- **First mate.** A conversation with the supervisor. Includes a form for requesting a new worker, with project, model, effort, and an optional planning step.
+- **First mate.** A conversation with the supervisor. Includes a form for requesting a new worker, with project, model, effort, and an optional planning step. Claude Code accepts some approvals only when they are typed in First mate's own terminal, so when a reply asks for one, a button copies the words to type and opens that terminal. crew-chat never types into it.
 - **Queued and finished work.** Requests and backlog tasks without a running worker appear as queued conversations. Workers that have been cleaned up keep their history and can be hidden.
 - **Attachments and previews.**
   - Paste or drop images into a message.
@@ -78,6 +78,7 @@ To update, run `git pull && npm ci` and restart. crew-chat stores its own data i
 | `CREW_CHAT_CLAUDE_PROJECTS` | Claude Code transcript directory. Default `$CLAUDE_CONFIG_DIR/projects` or `~/.claude/projects`. |
 | `CREW_CHAT_NO_USAGE` | Set to `1` to stop reading transcripts. Disables token counts and the Transcript tab. |
 | `CREW_CHAT_TMUX_SOCKET` | tmux server to use, as a socket name (`tmux -L`) or path (`tmux -S`). |
+| `CREW_CHAT_FIRSTMATE_WINDOW` | First mate's own tmux window (`session:window`, by name or index), opened by the approval hand-off. Default `firstmate:0`, Firstmate's own fallback. |
 | `CREW_CHAT_TERMINAL_CMD` | Command used by Open terminal, with `{cmd}` as a placeholder, for example `gnome-terminal -- sh -c {cmd}`. Defaults to Terminal.app on macOS and `x-terminal-emulator` on Linux. |
 
 ## How it works

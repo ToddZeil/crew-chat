@@ -2922,3 +2922,35 @@ button.msg-image {
 .meter-extra {
   opacity: 0.85;
 }
+
+/* Hand-off to First mate's terminal for typed approvals. */
+.handoff {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 8px;
+}
+
+.handoff-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.handoff-words {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.handoff-note {
+  font-size: 13px;
+}
+
+.handoff-note.good {
+  color: var(--good);
+}
+
+.handoff-note.warn {
+  color: var(--attention);
+}

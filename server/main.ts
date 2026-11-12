@@ -47,7 +47,8 @@ if (missing.length) {
   );
 }
 
-const { server, store } = createApp({ home: absHome, readOnly, tmux, staticDir, uploadDir, claudeProjectsDir, ledgerFile, archiveDir });
+const firstmateWindow = process.env.CREW_CHAT_FIRSTMATE_WINDOW || undefined;
+const { server, store } = createApp({ home: absHome, readOnly, tmux, staticDir, uploadDir, claudeProjectsDir, ledgerFile, archiveDir, firstmateWindow });
 server.listen(port, '127.0.0.1', () => {
   store.start();
   const addr = server.address();

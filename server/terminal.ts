@@ -57,11 +57,17 @@ export function groupedSessionName(id: string): string {
 // session (so other clients keep their current window), select the worker's
 // window in that new session only, and mark only the new session to be
 // destroyed once this client goes away. Every command names its target.
+// A window given as a bare number is an index (Firstmate's "firstmate:0");
+// anything else is matched as an exact window name.
+export function windowRef(window: string): string {
+  return /^\d+$/.test(window) ? window : `=${window}`;
+}
+
 export function tmuxCommandArgs(target: TmuxTarget, grouped: string, socketArgs: string[]): string[] {
   return [
     ...socketArgs,
     'new-session', '-t', `=${target.session}`, '-s', grouped,
-    ';', 'select-window', '-t', `=${grouped}:=${target.window}`,
+    ';', 'select-window', '-t', `=${grouped}:${windowRef(target.window)}`,
     ';', 'set-option', '-t', `${grouped}:`, 'destroy-unattached', 'on',
   ];
 }
@@ -112,6 +118,31 @@ export async function availability(
     return { available: false, reason: `The worker's tmux window "${target.window}" no longer exists.` };
   }
   return { available: true };
+}
+
+// Whether First mate's own tmux window exists, by name or index. Firstmate
+// finds its supervisor from the environment it runs in and records it nowhere
+// crew-chat can read, so the window comes from CREW_CHAT_FIRSTMATE_WINDOW or
+// Firstmate's documented fallback.
+export async function supervisorAvailability(tmux: TmuxConfig | null, value: string, canLaunch = true): Promise<TerminalAvailability> {
+  const target = parseWindow(value);
+  if (!target) return { available: false, reason: `"${value}" is not a tmux session:window. Set CREW_CHAT_FIRSTMATE_WINDOW.` };
+  if (!tmux) return { available: false, reason: 'tmux is not installed or not on PATH.' };
+  if (!canLaunch) return { available: false, reason: 'No terminal app to open it in. Set CREW_CHAT_TERMINAL_CMD.' };
+  const r = await run(tmux.bin, [...tmux.socketArgs, 'list-windows', '-t', `=${target.session}:`, '-F', '#{window_index}\t#{window_name}'], {
+    timeoutMs: 5_000,
+  });
+  if (r.exitCode !== 0) {
+    return { available: false, reason: `First mate's terminal was not found: no tmux session "${target.session}". If it runs elsewhere, set CREW_CHAT_FIRSTMATE_WINDOW.` };
+  }
+  const found = r.stdout
+    .split('\n')
+    .filter(Boolean)
+    .some((l) => {
+      const [index, name] = l.split('\t');
+      return /^\d+$/.test(target.window) ? index === target.window : name === target.window;
+    });
+  return found ? { available: true } : { available: false, reason: `First mate's terminal was not found: no window "${target.window}" in tmux session "${target.session}".` };
 }
 
 // A read-only copy of what the worker's tmux window shows right now, with

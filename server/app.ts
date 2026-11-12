@@ -14,6 +14,8 @@ const UPLOAD_NAME = /^[A-Za-z0-9-]+\.(png|jpg|gif|webp)$/;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_DOC_BYTES = 1024 * 1024;
 const LIMITS_MS = 30_000;
+// Firstmate's own fallback for where the supervisor runs (bin/fm-supervisor-target-lib.sh).
+const FIRSTMATE_WINDOW = 'firstmate:0';
 
 function inside(root: string, file: string): boolean {
   return file === root || file.startsWith(root + path.sep);
@@ -24,6 +26,7 @@ import {
   capturePane,
   groupedSessionName,
   parseWindow,
+  supervisorAvailability,
   shellCommand,
   pickLauncher,
   type Launcher,
@@ -45,6 +48,8 @@ export interface AppOptions {
   // Opens the worker's terminal; defaults to the platform's terminal app.
   launch?: Launcher | null;
   store?: Store;
+  // First mate's own tmux window, for opening its terminal.
+  firstmateWindow?: string;
   // How long one status-bar reading of plan usage is reused.
   limitsMs?: number;
 }
@@ -391,6 +396,23 @@ export function createApp(opts: AppOptions): { server: http.Server; store: Store
       if (parts[1] === 'doc' && parts.length === 2 && req.method === 'GET') return json(res, 200, readDoc(url));
       if (parts[1] === 'image' && parts.length === 2 && req.method === 'GET') return serveImage(url, res);
       if (parts[1] === 'firstmate' && parts.length === 2 && req.method === 'GET') return json(res, 200, store.firstmate());
+      if (parts[1] === 'firstmate' && parts[2] === 'terminal' && parts.length === 3) {
+        const where = opts.firstmateWindow ?? FIRSTMATE_WINDOW;
+        if (req.method === 'GET') return json(res, 200, await supervisorAvailability(opts.tmux, where, launch !== null));
+        if (req.method === 'POST') {
+          if (!sameOrigin(req)) return json(res, 403, refused('Cross-site request refused.'));
+          if (!(req.headers['content-type'] ?? '').startsWith('application/json')) return json(res, 415, refused('Send JSON.'));
+          if (opts.readOnly) return json(res, 403, refused('This crew-chat is running read-only.'));
+          const avail = await supervisorAvailability(opts.tmux, where, launch !== null);
+          const target = parseWindow(where);
+          if (!avail.available || !opts.tmux || !target || !launch) return json(res, 409, refused(avail.reason ?? "First mate's terminal is not available."));
+          const r = await launch(shellCommand(opts.tmux, target, groupedSessionName('firstmate')));
+          if (r.exitCode !== 0) {
+            return json(res, 502, { ok: false, outcome: 'refused', exitCode: r.exitCode, stdout: '', stderr: r.stderr, error: r.error ?? 'Terminal did not open.' } satisfies WriteResult);
+          }
+          return json(res, 200, { ok: true, outcome: 'sent', exitCode: 0, stdout: '', stderr: '' } satisfies WriteResult);
+        }
+      }
       if (parts[1] === 'firstmate' && parts[2] === 'notes' && parts.length === 3 && req.method === 'POST') {
         return handleNote(req, res);
       }

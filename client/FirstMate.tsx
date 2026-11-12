@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import type { FirstmateDetail, FirstmateNote, WriteResult } from '../shared/types.ts';
 import { api } from './api.ts';
 import { Collapsible } from './format.tsx';
+import { Handoff } from './Handoff.tsx';
 import { Avatar, MessageList, type Row } from './messages.tsx';
 import { newRequestId, noteAsWrite, PENDING_TEXT, type Notice } from './model.ts';
 import { ComposerBox, FIRST_MATE, NoticeView, pendingRow, quoteInto, restoreDraft, YOU, type Pending } from './ThreadView.tsx';
@@ -96,7 +97,12 @@ export function FirstmateView({
         className: 'in tone-busy',
         attrs: { 'data-reply-to': n.id },
         copyText: n.reply.body,
-        body: <Collapsible text={n.reply.body} />,
+        body: (
+          <>
+            <Collapsible text={n.reply.body} />
+            <Handoff text={n.reply.body} readOnly={readOnly} />
+          </>
+        ),
       });
     }
   }

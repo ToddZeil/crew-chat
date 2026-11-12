@@ -157,6 +157,8 @@ test.beforeAll(async ({ browser }) => {
     CREW_CHAT_CLAUDE_PROJECTS: projectsDir,
     CREW_CHAT_LEDGER: ledgerFile,
     CREW_CHAT_ARCHIVE: path.join(uploadDir, 'archive'),
+    // Stands in for First mate's own window, on the private tmux server.
+    CREW_CHAT_FIRSTMATE_WINDOW: 'crewtest:0',
     TMUX_TMPDIR: tmuxDir,
     TMUX: '',
   });
@@ -1167,6 +1169,31 @@ test('Claude plan usage from a worker status bar shows small under the token tot
   await expect(usage).toContainText('42%');
   await expect(usage.locator('.meter[data-level="high"]')).toHaveCount(1);
   await expect(usage).toHaveAttribute('title', /^Claude plan usage, from [a-z-]+'s status bar/);
+});
+
+test("a First mate reply that asks for a typed approval copies the words and opens First mate's terminal", async ({ browser }) => {
+  home.writeNote('note-approve', 'Is phase 1 ready to go?', true, 'Yes: Claude Code only accepts that approval in the main terminal. Type "go on phase 1" in the main terminal and it starts.');
+  const ctx = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'], colorScheme: 'light' });
+  const p = await ctx.newPage();
+  try {
+    await p.goto(`${server.base}/#/firstmate`);
+    const reply = p.locator('[data-reply-to="note-approve"]');
+    const handoff = reply.getByTestId('handoff');
+    await expect(handoff).toContainText('to type go on phase 1');
+    const before = readFileSync(terminalLog, 'utf8').trim().split('\n').filter(Boolean).length;
+    await handoff.getByRole('button', { name: "Copy and open First mate's terminal" }).click();
+    await expect(handoff.getByRole('status')).toHaveText(`Copied "go on phase 1". Opened First mate's terminal: paste it there and press Enter.`);
+    expect(await p.evaluate(() => navigator.clipboard.readText())).toBe('go on phase 1');
+    await expect.poll(() => readFileSync(terminalLog, 'utf8').trim().split('\n').filter(Boolean).length).toBe(before + 1);
+    const command = JSON.parse(readFileSync(terminalLog, 'utf8').trim().split('\n').at(-1)!) as string;
+    expect(command).toContain(`'new-session' '-t' '=crewtest' '-s' 'crewchat-firstmate-`);
+    expect(command).toMatch(/'select-window' '-t' '=crewchat-firstmate-[0-9a-f]{6}:0'/);
+    // Nothing is typed into First mate's terminal.
+    expect(command).not.toContain('send-keys');
+    await expect(p.locator('.msg', { hasText: 'Is phase 1 ready to go?' }).getByTestId('handoff')).toHaveCount(0);
+  } finally {
+    await ctx.close();
+  }
 });
 
 test('a decision with open questions lays them out one by one and sends them as one answer', async () => {

@@ -26,6 +26,7 @@ const { server, store } = createApp({
   archiveDir: process.env.CREW_CHAT_ARCHIVE ?? null,
   claudeProjectsDir: process.env.CREW_CHAT_CLAUDE_PROJECTS ?? null,
   limitsMs: 0,
+  firstmateWindow: process.env.CREW_CHAT_FIRSTMATE_WINDOW,
   launch: async (command) => {
     appendFileSync(log, `${JSON.stringify(command)}\n`);
     return { exitCode: 0, stderr: '' };
